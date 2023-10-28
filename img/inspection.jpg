@@ -1,0 +1,2632 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+function _export(target, all) {
+    for(var name in all)Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+    });
+}
+_export(exports, {
+    INTERNAL_FEATURES: function() {
+        return INTERNAL_FEATURES;
+    },
+    isValidVariantFormatString: function() {
+        return isValidVariantFormatString;
+    },
+    parseVariant: function() {
+        return parseVariant;
+    },
+    getFileModifiedMap: function() {
+        return getFileModifiedMap;
+    },
+    createContext: function() {
+        return createContext;
+    },
+    getContext: function() {
+        return getContext;
+    }
+});
+const _fs = /*#__PURE__*/ _interop_require_default(require("fs"));
+const _url = /*#__PURE__*/ _interop_require_default(require("url"));
+const _postcss = /*#__PURE__*/ _interop_require_default(require("postcss"));
+const _dlv = /*#__PURE__*/ _interop_require_default(require("dlv"));
+const _postcssselectorparser = /*#__PURE__*/ _interop_require_default(require("postcss-selector-parser"));
+const _transformThemeValue = /*#__PURE__*/ _interop_require_default(require("../util/transformThemeValue"));
+const _parseObjectStyles = /*#__PURE__*/ _interop_require_default(require("../util/parseObjectStyles"));
+const _prefixSelector = /*#__PURE__*/ _interop_require_default(require("../util/prefixSelector"));
+const _isPlainObject = /*#__PURE__*/ _interop_require_default(require("../util/isPlainObject"));
+const _escapeClassName = /*#__PURE__*/ _interop_require_default(require("../util/escapeClassName"));
+const _nameClass = /*#__PURE__*/ _interop_require_wildcard(require("../util/nameClass"));
+const _pluginUtils = require("../util/pluginUtils");
+const _corePlugins = require("../corePlugins");
+const _sharedState = /*#__PURE__*/ _interop_require_wildcard(require("./sharedState"));
+const _toPath = require("../util/toPath");
+const _log = /*#__PURE__*/ _interop_require_default(require("../util/log"));
+const _negateValue = /*#__PURE__*/ _interop_require_default(require("../util/negateValue"));
+const _isSyntacticallyValidPropertyValue = /*#__PURE__*/ _interop_require_default(require("../util/isSyntacticallyValidPropertyValue"));
+const _generateRules = require("./generateRules");
+const _cacheInvalidation = require("./cacheInvalidation.js");
+const _offsets = require("./offsets.js");
+const _featureFlags = require("../featureFlags.js");
+const _formatVariantSelector = require("../util/formatVariantSelector");
+function _interop_require_default(obj) {
+    return obj && obj.__esModule ? obj : {
+        default: obj
+    };
+}
+function _getRequireWildcardCache(nodeInterop) {
+    if (typeof WeakMap !== "function") return null;
+    var cacheBabelInterop = new WeakMap();
+    var cacheNodeInterop = new WeakMap();
+    return (_getRequireWildcardCache = function(nodeInterop) {
+        return nodeInterop ? cacheNodeInterop : cacheBabelInterop;
+    })(nodeInterop);
+}
+function _interop_require_wildcard(obj, nodeInterop) {
+    if (!nodeInterop && obj && obj.__esModule) {
+        return obj;
+    }
+    if (obj === null || typeof obj !== "object" && typeof obj !== "function") {
+        return {
+            default: obj
+        };
+    }
+    var cache = _getRequireWildcardCache(nodeInterop);
+    if (cache && cache.has(obj)) {
+        return cache.get(obj);
+    }
+    var newObj = {};
+    var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor;
+    for(var key in obj){
+        if (key !== "default" && Object.prototype.hasOwnProperty.call(obj, key)) {
+            var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null;
+            if (desc && (desc.get || desc.set)) {
+                Object.defineProperty(newObj, key, desc);
+            } else {
+                newObj[key] = obj[key];
+            }
+        }
+    }
+    newObj.default = obj;
+    if (cache) {
+        cache.set(obj, newObj);
+    }
+    return newObj;
+}
+const INTERNAL_FEATURES = Symbol();
+const VARIANT_TYPES = {
+    AddVariant: Symbol.for("ADD_VARIANT"),
+    MatchVariant: Symbol.for("MATCH_VARIANT")
+};
+const VARIANT_INFO = {
+    Base: 1 << 0,
+    Dynamic: 1 << 1
+};
+function prefix(context, selector) {
+    let prefix = context.tailwindConfig.prefix;
+    return typeof prefix === "function" ? prefix(selector) : prefix + selector;
+}
+function normalizeOptionTypes({ type ="any" , ...options }) {
+    let types = [].concat(type);
+    return {
+        ...options,
+        types: types.map((type)=>{
+            if (Array.isArray(type)) {
+                return {
+                    type: type[0],
+                    ...type[1]
+                };
+            }
+            return {
+                type,
+                preferOnConflict: false
+            };
+        })
+    };
+}
+function parseVariantFormatString(input) {
+    /** @type {string[]} */ let parts = [];
+    // When parsing whitespace around special characters are insignificant
+    // However, _inside_ of a variant they could be
+    // Because the selector could look like this
+    // @media { &[data-name="foo bar"] }
+    // This is why we do not skip whitespace
+    let current = "";
+    let depth = 0;
+    for(let idx = 0; idx < input.length; idx++){
+        let char = input[idx];
+        if (char === "\\") {
+            // Escaped characters are not special
+            current += "\\" + input[++idx];
+        } else if (char === "{") {
+            // Nested rule: start
+            ++depth;
+            parts.push(current.trim());
+            current = "";
+        } else if (char === "}") {
+            // Nested rule: end
+            if (--depth < 0) {
+                throw new Error(`Your { and } are unbalanced.`);
+            }
+            parts.push(current.trim());
+            current = "";
+        } else {
+            // Normal character
+            current += char;
+        }
+    }
+    if (current.length > 0) {
+        parts.push(current.trim());
+    }
+    parts = parts.filter((part)=>part !== "");
+    return parts;
+}
+function insertInto(list, value, { before =[]  } = {}) {
+    before = [].concat(before);
+    if (before.length <= 0) {
+        list.push(value);
+        return;
+    }
+    let idx = list.length - 1;
+    for (let other of before){
+        let iidx = list.indexOf(other);
+        if (iidx === -1) continue;
+        idx = Math.min(idx, iidx);
+    }
+    list.splice(idx, 0, value);
+}
+function parseStyles(styles) {
+    if (!Array.isArray(styles)) {
+        return parseStyles([
+            styles
+        ]);
+    }
+    return styles.flatMap((style)=>{
+        let isNode = !Array.isArray(style) && !(0, _isPlainObject.default)(style);
+        return isNode ? style : (0, _parseObjectStyles.default)(style);
+    });
+}
+function getClasses(selector, mutate) {
+    let parser = (0, _postcssselectorparser.default)((selectors)=>{
+        let allClasses = [];
+        if (mutate) {
+            mutate(selectors);
+        }
+        selectors.walkClasses((classNode)=>{
+            allClasses.push(classNode.value);
+        });
+        return allClasses;
+    });
+    return parser.transformSync(selector);
+}
+function extractCandidates(node, state = {
+    containsNonOnDemandable: false
+}, depth = 0) {
+    let classes = [];
+    // Handle normal rules
+    if (node.type === "rule") {
+        // Ignore everything inside a :not(...). This allows you to write code like
+        // `div:not(.foo)`. If `.foo` is never found in your code, then we used to
+        // not generated it. But now we will ignore everything inside a `:not`, so
+        // that it still gets generated.
+        function ignoreNot(selectors) {
+            selectors.walkPseudos((pseudo)=>{
+                if (pseudo.value === ":not") {
+                    pseudo.remove();
+                }
+            });
+        }
+        for (let selector of node.selectors){
+            let classCandidates = getClasses(selector, ignoreNot);
+            // At least one of the selectors contains non-"on-demandable" candidates.
+            if (classCandidates.length === 0) {
+                state.containsNonOnDemandable = true;
+            }
+            for (let classCandidate of classCandidates){
+                classes.push(classCandidate);
+            }
+        }
+    } else if (node.type === "atrule") {
+        node.walkRules((rule)=>{
+            for (let classCandidate of rule.selectors.flatMap((selector)=>getClasses(selector))){
+                classes.push(classCandidate);
+            }
+        });
+    }
+    if (depth === 0) {
+        return [
+            state.containsNonOnDemandable || classes.length === 0,
+            classes
+        ];
+    }
+    return classes;
+}
+function withIdentifiers(styles) {
+    return parseStyles(styles).flatMap((node)=>{
+        let nodeMap = new Map();
+        let [containsNonOnDemandableSelectors, candidates] = extractCandidates(node);
+        // If this isn't "on-demandable", assign it a universal candidate to always include it.
+        if (containsNonOnDemandableSelectors) {
+            candidates.unshift(_sharedState.NOT_ON_DEMAND);
+        }
+        // However, it could be that it also contains "on-demandable" candidates.
+        // E.g.: `span, .foo {}`, in that case it should still be possible to use
+        // `@apply foo` for example.
+        return candidates.map((c)=>{
+            if (!nodeMap.has(node)) {
+                nodeMap.set(node, node);
+            }
+            return [
+                c,
+                nodeMap.get(node)
+            ];
+        });
+    });
+}
+function isValidVariantFormatString(format) {
+    return format.startsWith("@") || format.includes("&");
+}
+function parseVariant(variant) {
+    variant = variant.replace(/\n+/g, "").replace(/\s{1,}/g, " ").trim();
+    let fns = parseVariantFormatString(variant).map((str)=>{
+        if (!str.startsWith("@")) {
+            return ({ format  })=>format(str);
+        }
+        let [, name, params] = /@(\S*)( .+|[({].*)?/g.exec(str);
+        var _params_trim;
+        return ({ wrap  })=>{
+            return wrap(_postcss.default.atRule({
+                name,
+                params: (_params_trim = params === null || params === void 0 ? void 0 : params.trim()) !== null && _params_trim !== void 0 ? _params_trim : ""
+            }));
+        };
+    }).reverse();
+    return (api)=>{
+        for (let fn of fns){
+            fn(api);
+        }
+    };
+}
+/**
+ *
+ * @param {any} tailwindConfig
+ * @param {any} context
+ * @param {object} param2
+ * @param {Offsets} param2.offsets
+ */ function buildPluginApi(tailwindConfig, context, { variantList , variantMap , offsets , classList  }) {
+    function getConfigValue(path, defaultValue) {
+        return path ? (0, _dlv.default)(tailwindConfig, path, defaultValue) : tailwindConfig;
+    }
+    function applyConfiguredPrefix(selector) {
+        return (0, _prefixSelector.default)(tailwindConfig.prefix, selector);
+    }
+    function prefixIdentifier(identifier, options) {
+        if (identifier === _sharedState.NOT_ON_DEMAND) {
+            return _sharedState.NOT_ON_DEMAND;
+        }
+        if (!options.respectPrefix) {
+            return identifier;
+        }
+        return context.tailwindConfig.prefix + identifier;
+    }
+    function resolveThemeValue(path, defaultValue, opts = {}) {
+        let parts = (0, _toPath.toPath)(path);
+        let value = getConfigValue([
+            "theme",
+            ...parts
+        ], defaultValue);
+        return (0, _transformThemeValue.default)(parts[0])(value, opts);
+    }
+    let variantIdentifier = 0;
+    let api = {
+        postcss: _postcss.default,
+        prefix: applyConfiguredPrefix,
+        e: _escapeClassName.default,
+        config: getConfigValue,
+        theme: resolveThemeValue,
+        corePlugins: (path)=>{
+            if (Array.isArray(tailwindConfig.corePlugins)) {
+                return tailwindConfig.corePlugins.includes(path);
+            }
+            return getConfigValue([
+                "corePlugins",
+                path
+            ], true);
+        },
+        variants: ()=>{
+            // Preserved for backwards compatibility but not used in v3.0+
+            return [];
+        },
+        addBase (base) {
+            for (let [identifier, rule] of withIdentifiers(base)){
+                let prefixedIdentifier = prefixIdentifier(identifier, {});
+                let offset = offsets.create("base");
+                if (!context.candidateRuleMap.has(prefixedIdentifier)) {
+                    context.candidateRuleMap.set(prefixedIdentifier, []);
+                }
+                context.candidateRuleMap.get(prefixedIdentifier).push([
+                    {
+                        sort: offset,
+                        layer: "base"
+                    },
+                    rule
+                ]);
+            }
+        },
+        /**
+     * @param {string} group
+     * @param {Record<string, string | string[]>} declarations
+     */ addDefaults (group, declarations) {
+            const groups = {
+                [`@defaults ${group}`]: declarations
+            };
+            for (let [identifier, rule] of withIdentifiers(groups)){
+                let prefixedIdentifier = prefixIdentifier(identifier, {});
+                if (!context.candidateRuleMap.has(prefixedIdentifier)) {
+                    context.candidateRuleMap.set(prefixedIdentifier, []);
+                }
+                context.candidateRuleMap.get(prefixedIdentifier).push([
+                    {
+                        sort: offsets.create("defaults"),
+                        layer: "defaults"
+                    },
+                    rule
+                ]);
+            }
+        },
+        addComponents (components, options) {
+            let defaultOptions = {
+                preserveSource: false,
+                respectPrefix: true,
+                respectImportant: false
+            };
+            options = Object.assign({}, defaultOptions, Array.isArray(options) ? {} : options);
+            for (let [identifier, rule] of withIdentifiers(components)){
+                let prefixedIdentifier = prefixIdentifier(identifier, options);
+                classList.add(prefixedIdentifier);
+                if (!context.candidateRuleMap.has(prefixedIdentifier)) {
+                    context.candidateRuleMap.set(prefixedIdentifier, []);
+                }
+                context.candidateRuleMap.get(prefixedIdentifier).push([
+                    {
+                        sort: offsets.create("components"),
+                        layer: "components",
+                        options
+                    },
+                    rule
+                ]);
+            }
+        },
+        addUtilities (utilities, options) {
+            let defaultOptions = {
+                preserveSource: false,
+                respectPrefix: true,
+                respectImportant: true
+            };
+            options = Object.assign({}, defaultOptions, Array.isArray(options) ? {} : options);
+            for (let [identifier, rule] of withIdentifiers(utilities)){
+                let prefixedIdentifier = prefixIdentifier(identifier, options);
+                classList.add(prefixedIdentifier);
+                if (!context.candidateRuleMap.has(prefixedIdentifier)) {
+                    context.candidateRuleMap.set(prefixedIdentifier, []);
+                }
+                context.candidateRuleMap.get(prefixedIdentifier).push([
+                    {
+                        sort: offsets.create("utilities"),
+                        layer: "utilities",
+                        options
+                    },
+                    rule
+                ]);
+            }
+        },
+        matchUtilities: function(utilities, options) {
+            let defaultOptions = {
+                respectPrefix: true,
+                respectImportant: true,
+                modifiers: false
+            };
+            options = normalizeOptionTypes({
+                ...defaultOptions,
+                ...options
+            });
+            let offset = offsets.create("utilities");
+            for(let identifier in utilities){
+                let prefixedIdentifier = prefixIdentifier(identifier, options);
+                let rule = utilities[identifier];
+                classList.add([
+                    prefixedIdentifier,
+                    options
+                ]);
+                function wrapped(modifier, { isOnlyPlugin  }) {
+                    let [value, coercedType, utilityModifier] = (0, _pluginUtils.coerceValue)(options.types, modifier, options, tailwindConfig);
+                    if (value === undefined) {
+                        return [];
+                    }
+                    if (!options.types.some(({ type  })=>type === coercedType)) {
+                        if (isOnlyPlugin) {
+                            _log.default.warn([
+                                `Unnecessary typehint \`${coercedType}\` in \`${identifier}-${modifier}\`.`,
+                                `You can safely update it to \`${identifier}-${modifier.replace(coercedType + ":", "")}\`.`
+                            ]);
+                        } else {
+                            return [];
+                        }
+                    }
+                    if (!(0, _isSyntacticallyValidPropertyValue.default)(value)) {
+                        return [];
+                    }
+                    let extras = {
+                        get modifier () {
+                            if (!options.modifiers) {
+                                _log.default.warn(`modifier-used-without-options-for-${identifier}`, [
+                                    "Your plugin must set `modifiers: true` in its options to support modifiers."
+                                ]);
+                            }
+                            return utilityModifier;
+                        }
+                    };
+                    let modifiersEnabled = (0, _featureFlags.flagEnabled)(tailwindConfig, "generalizedModifiers");
+                    let ruleSets = [].concat(modifiersEnabled ? rule(value, extras) : rule(value)).filter(Boolean).map((declaration)=>({
+                            [(0, _nameClass.default)(identifier, modifier)]: declaration
+                        }));
+                    return ruleSets;
+                }
+                let withOffsets = [
+                    {
+                        sort: offset,
+                        layer: "utilities",
+                        options
+                    },
+                    wrapped
+                ];
+                if (!context.candidateRuleMap.has(prefixedIdentifier)) {
+                    context.candidateRuleMap.set(prefixedIdentifier, []);
+                }
+                context.candidateRuleMap.get(prefixedIdentifier).push(withOffsets);
+            }
+        },
+        matchComponents: function(components, options) {
+            let defaultOptions = {
+                respectPrefix: true,
+                respectImportant: false,
+                modifiers: false
+            };
+            options = normalizeOptionTypes({
+                ...defaultOptions,
+                ...options
+            });
+            let offset = offsets.create("components");
+            for(let identifier in components){
+                let prefixedIdentifier = prefixIdentifier(identifier, options);
+                let rule = components[identifier];
+                classList.add([
+                    prefixedIdentifier,
+                    options
+                ]);
+                function wrapped(modifier, { isOnlyPlugin  }) {
+                    let [value, coercedType, utilityModifier] = (0, _pluginUtils.coerceValue)(options.types, modifier, options, tailwindConfig);
+                    if (value === undefined) {
+                        return [];
+                    }
+                    if (!options.types.some(({ type  })=>type === coercedType)) {
+                        if (isOnlyPlugin) {
+                            _log.default.warn([
+                                `Unnecessary typehint \`${coercedType}\` in \`${identifier}-${modifier}\`.`,
+                                `You can safely update it to \`${identifier}-${modifier.replace(coercedType + ":", "")}\`.`
+                            ]);
+                        } else {
+                            return [];
+                        }
+                    }
+                    if (!(0, _isSyntacticallyValidPropertyValue.default)(value)) {
+                        return [];
+                    }
+                    let extras = {
+                        get modifier () {
+                            if (!options.modifiers) {
+                                _log.default.warn(`modifier-used-without-options-for-${identifier}`, [
+                                    "Your plugin must set `modifiers: true` in its options to support modifiers."
+                                ]);
+                            }
+                            return utilityModifier;
+                        }
+                    };
+                    let modifiersEnabled = (0, _featureFlags.flagEnabled)(tailwindConfig, "generalizedModifiers");
+                    let ruleSets = [].concat(modifiersEnabled ? rule(value, extras) : rule(value)).filter(Boolean).map((declaration)=>({
+                            [(0, _nameClass.default)(identifier, modifier)]: declaration
+                        }));
+                    return ruleSets;
+                }
+                let withOffsets = [
+                    {
+                        sort: offset,
+                        layer: "components",
+                        options
+                    },
+                    wrapped
+                ];
+                if (!context.candidateRuleMap.has(prefixedIdentifier)) {
+                    context.candidateRuleMap.set(prefixedIdentifier, []);
+                }
+                context.candidateRuleMap.get(prefixedIdentifier).push(withOffsets);
+            }
+        },
+        addVariant (variantName, variantFunctions, options = {}) {
+            variantFunctions = [].concat(variantFunctions).map((variantFunction)=>{
+                if (typeof variantFunction !== "string") {
+                    // Safelist public API functions
+                    return (api = {})=>{
+                        let { args , modifySelectors , container , separator , wrap , format  } = api;
+                        let result = variantFunction(Object.assign({
+                            modifySelectors,
+                            container,
+                            separator
+                        }, options.type === VARIANT_TYPES.MatchVariant && {
+                            args,
+                            wrap,
+                            format
+                        }));
+                        if (typeof result === "string" && !isValidVariantFormatString(result)) {
+                            throw new Error(`Your custom variant \`${variantName}\` has an invalid format string. Make sure it's an at-rule or contains a \`&\` placeholder.`);
+                        }
+                        if (Array.isArray(result)) {
+                            return result.filter((variant)=>typeof variant === "string").map((variant)=>parseVariant(variant));
+                        }
+                        // result may be undefined with legacy variants that use APIs like `modifySelectors`
+                        // result may also be a postcss node if someone was returning the result from `modifySelectors`
+                        return result && typeof result === "string" && parseVariant(result)(api);
+                    };
+                }
+                if (!isValidVariantFormatString(variantFunction)) {
+                    throw new Error(`Your custom variant \`${variantName}\` has an invalid format string. Make sure it's an at-rule or contains a \`&\` placeholder.`);
+                }
+                return parseVariant(variantFunction);
+            });
+            insertInto(variantList, variantName, options);
+            variantMap.set(variantName, variantFunctions);
+            context.variantOptions.set(variantName, options);
+        },
+        matchVariant (variant, variantFn, options) {
+            var _options_id;
+            // A unique identifier that "groups" these variants together.
+            // This is for internal use only which is why it is not present in the types
+            let id = (_options_id = options === null || options === void 0 ? void 0 : options.id) !== null && _options_id !== void 0 ? _options_id : ++variantIdentifier;
+            let isSpecial = variant === "@";
+            let modifiersEnabled = (0, _featureFlags.flagEnabled)(tailwindConfig, "generalizedModifiers");
+            var _options_values;
+            for (let [key, value] of Object.entries((_options_values = options === null || options === void 0 ? void 0 : options.values) !== null && _options_values !== void 0 ? _options_values : {})){
+                if (key === "DEFAULT") continue;
+                api.addVariant(isSpecial ? `${variant}${key}` : `${variant}-${key}`, ({ args , container  })=>{
+                    return variantFn(value, modifiersEnabled ? {
+                        modifier: args === null || args === void 0 ? void 0 : args.modifier,
+                        container
+                    } : {
+                        container
+                    });
+                }, {
+                    ...options,
+                    value,
+                    id,
+                    type: VARIANT_TYPES.MatchVariant,
+                    variantInfo: VARIANT_INFO.Base
+                });
+            }
+            var _options_values1;
+            let hasDefault = "DEFAULT" in ((_options_values1 = options === null || options === void 0 ? void 0 : options.values) !== null && _options_values1 !== void 0 ? _options_values1 : {});
+            api.addVariant(variant, ({ args , container  })=>{
+                if ((args === null || args === void 0 ? void 0 : args.value) === _sharedState.NONE && !hasDefault) {
+                    return null;
+                }
+                var // (JetBrains) plugins.
+                _args_value;
+                return variantFn((args === null || args === void 0 ? void 0 : args.value) === _sharedState.NONE ? options.values.DEFAULT : (_args_value = args === null || args === void 0 ? void 0 : args.value) !== null && _args_value !== void 0 ? _args_value : typeof args === "string" ? args : "", modifiersEnabled ? {
+                    modifier: args === null || args === void 0 ? void 0 : args.modifier,
+                    container
+                } : {
+                    container
+                });
+            }, {
+                ...options,
+                id,
+                type: VARIANT_TYPES.MatchVariant,
+                variantInfo: VARIANT_INFO.Dynamic
+            });
+        }
+    };
+    return api;
+}
+let fileModifiedMapCache = new WeakMap();
+function getFileModifiedMap(context) {
+    if (!fileModifiedMapCache.has(context)) {
+        fileModifiedMapCache.set(context, new Map());
+    }
+    return fileModifiedMapCache.get(context);
+}
+function trackModified(files, fileModifiedMap) {
+    let changed = false;
+    let mtimesToCommit = new Map();
+    for (let file of files){
+        var _fs_statSync;
+        if (!file) continue;
+        let parsed = _url.default.parse(file);
+        let pathname = parsed.hash ? parsed.href.replace(parsed.hash, "") : parsed.href;
+        pathname = parsed.search ? pathname.replace(parsed.search, "") : pathname;
+        let newModified = (_fs_statSync = _fs.default.statSync(decodeURIComponent(pathname), {
+            throwIfNoEntry: false
+        })) === null || _fs_statSync === void 0 ? void 0 : _fs_statSync.mtimeMs;
+        if (!newModified) {
+            continue;
+        }
+        if (!fileModifiedMap.has(file) || newModified > fileModifiedMap.get(file)) {
+            changed = true;
+        }
+        mtimesToCommit.set(file, newModified);
+    }
+    return [
+        changed,
+        mtimesToCommit
+    ];
+}
+function extractVariantAtRules(node) {
+    node.walkAtRules((atRule)=>{
+        if ([
+            "responsive",
+            "variants"
+        ].includes(atRule.name)) {
+            extractVariantAtRules(atRule);
+            atRule.before(atRule.nodes);
+            atRule.remove();
+        }
+    });
+}
+function collectLayerPlugins(root) {
+    let layerPlugins = [];
+    root.each((node)=>{
+        if (node.type === "atrule" && [
+            "responsive",
+            "variants"
+        ].includes(node.name)) {
+            node.name = "layer";
+            node.params = "utilities";
+        }
+    });
+    // Walk @layer rules and treat them like plugins
+    root.walkAtRules("layer", (layerRule)=>{
+        extractVariantAtRules(layerRule);
+        if (layerRule.params === "base") {
+            for (let node of layerRule.nodes){
+                layerPlugins.push(function({ addBase  }) {
+                    addBase(node, {
+                        respectPrefix: false
+                    });
+                });
+            }
+            layerRule.remove();
+        } else if (layerRule.params === "components") {
+            for (let node of layerRule.nodes){
+                layerPlugins.push(function({ addComponents  }) {
+                    addComponents(node, {
+                        respectPrefix: false,
+                        preserveSource: true
+                    });
+                });
+            }
+            layerRule.remove();
+        } else if (layerRule.params === "utilities") {
+            for (let node of layerRule.nodes){
+                layerPlugins.push(function({ addUtilities  }) {
+                    addUtilities(node, {
+                        respectPrefix: false,
+                        preserveSource: true
+                    });
+                });
+            }
+            layerRule.remove();
+        }
+    });
+    return layerPlugins;
+}
+function resolvePlugins(context, root) {
+    let corePluginList = Object.entries({
+        ..._corePlugins.variantPlugins,
+        ..._corePlugins.corePlugins
+    }).map(([name, plugin])=>{
+        if (!context.tailwindConfig.corePlugins.includes(name)) {
+            return null;
+        }
+        return plugin;
+    }).filter(Boolean);
+    let userPlugins = context.tailwindConfig.plugins.map((plugin)=>{
+        if (plugin.__isOptionsFunction) {
+            plugin = plugin();
+        }
+        return typeof plugin === "function" ? plugin : plugin.handler;
+    });
+    let layerPlugins = collectLayerPlugins(root);
+    // TODO: This is a workaround for backwards compatibility, since custom variants
+    // were historically sorted before screen/stackable variants.
+    let beforeVariants = [
+        _corePlugins.variantPlugins["pseudoElementVariants"],
+        _corePlugins.variantPlugins["pseudoClassVariants"],
+        _corePlugins.variantPlugins["ariaVariants"],
+        _corePlugins.variantPlugins["dataVariants"]
+    ];
+    let afterVariants = [
+        _corePlugins.variantPlugins["supportsVariants"],
+        _corePlugins.variantPlugins["directionVariants"],
+        _corePlugins.variantPlugins["reducedMotionVariants"],
+        _corePlugins.variantPlugins["prefersContrastVariants"],
+        _corePlugins.variantPlugins["darkVariants"],
+        _corePlugins.variantPlugins["printVariant"],
+        _corePlugins.variantPlugins["screenVariants"],
+        _corePlugins.variantPlugins["orientationVariants"]
+    ];
+    return [
+        ...corePluginList,
+        ...beforeVariants,
+        ...userPlugins,
+        ...afterVariants,
+        ...layerPlugins
+    ];
+}
+function registerPlugins(plugins, context) {
+    let variantList = [];
+    let variantMap = new Map();
+    context.variantMap = variantMap;
+    let offsets = new _offsets.Offsets();
+    context.offsets = offsets;
+    let classList = new Set();
+    let pluginApi = buildPluginApi(context.tailwindConfig, context, {
+        variantList,
+        variantMap,
+        offsets,
+        classList
+    });
+    for (let plugin of plugins){
+        if (Array.isArray(plugin)) {
+            for (let pluginItem of plugin){
+                pluginItem(pluginApi);
+            }
+        } else {
+            plugin === null || plugin === void 0 ? void 0 : plugin(pluginApi);
+        }
+    }
+    // Make sure to record bit masks for every variant
+    offsets.recordVariants(variantList, (variant)=>variantMap.get(variant).length);
+    // Build variantMap
+    for (let [variantName, variantFunctions] of variantMap.entries()){
+        context.variantMap.set(variantName, variantFunctions.map((variantFunction, idx)=>[
+                offsets.forVariant(variantName, idx),
+                variantFunction
+            ]));
+    }
+    var _context_tailwindConfig_safelist;
+    let safelist = ((_context_tailwindConfig_safelist = context.tailwindConfig.safelist) !== null && _context_tailwindConfig_safelist !== void 0 ? _context_tailwindConfig_safelist : []).filter(Boolean);
+    if (safelist.length > 0) {
+        let checks = [];
+        for (let value of safelist){
+            if (typeof value === "string") {
+                context.changedContent.push({
+                    content: value,
+                    extension: "html"
+                });
+                continue;
+            }
+            if (value instanceof RegExp) {
+                _log.default.warn("root-regex", [
+                    "Regular expressions in `safelist` work differently in Tailwind CSS v3.0.",
+                    "Update your `safelist` configuration to eliminate this warning.",
+                    "https://tailwindcss.com/docs/content-configuration#safelisting-classes"
+                ]);
+                continue;
+            }
+            checks.push(value);
+        }
+        if (checks.length > 0) {
+            let patternMatchingCount = new Map();
+            let prefixLength = context.tailwindConfig.prefix.length;
+            let checkImportantUtils = checks.some((check)=>check.pattern.source.includes("!"));
+            for (let util of classList){
+                let utils = Array.isArray(util) ? (()=>{
+                    let [utilName, options] = util;
+                    var _options_values;
+                    let values = Object.keys((_options_values = options === null || options === void 0 ? void 0 : options.values) !== null && _options_values !== void 0 ? _options_values : {});
+                    let classes = values.map((value)=>(0, _nameClass.formatClass)(utilName, value));
+                    if (options === null || options === void 0 ? void 0 : options.supportsNegativeValues) {
+                        // This is the normal negated version
+                        // e.g. `-inset-1` or `-tw-inset-1`
+                        classes = [
+                            ...classes,
+                            ...classes.map((cls)=>"-" + cls)
+                        ];
+                        // This is the negated version *after* the prefix
+                        // e.g. `tw--inset-1`
+                        // The prefix is already attached to util name
+                        // So we add the negative after the prefix
+                        classes = [
+                            ...classes,
+                            ...classes.map((cls)=>cls.slice(0, prefixLength) + "-" + cls.slice(prefixLength))
+                        ];
+                    }
+                    if (options.types.some(({ type  })=>type === "color")) {
+                        classes = [
+                            ...classes,
+                            ...classes.flatMap((cls)=>Object.keys(context.tailwindConfig.theme.opacity).map((opacity)=>`${cls}/${opacity}`))
+                        ];
+                    }
+                    if (checkImportantUtils && (options === null || options === void 0 ? void 0 : options.respectImportant)) {
+                        classes = [
+                            ...classes,
+                            ...classes.map((cls)=>"!" + cls)
+                        ];
+                    }
+                    return classes;
+                })() : [
+                    util
+                ];
+                for (let util of utils){
+                    for (let { pattern , variants =[]  } of checks){
+                        // RegExp with the /g flag are stateful, so let's reset the last
+                        // index pointer to reset the state.
+                        pattern.lastIndex = 0;
+                        if (!patternMatchingCount.has(pattern)) {
+                            patternMatchingCount.set(pattern, 0);
+                        }
+                        if (!pattern.test(util)) continue;
+                        patternMatchingCount.set(pattern, patternMatchingCount.get(pattern) + 1);
+                        context.changedContent.push({
+                            content: util,
+                            extension: "html"
+                        });
+                        for (let variant of variants){
+                            context.changedContent.push({
+                                content: variant + context.tailwindConfig.separator + util,
+                                extension: "html"
+                            });
+                        }
+                    }
+                }
+            }
+            for (let [regex, count] of patternMatchingCount.entries()){
+                if (count !== 0) continue;
+                _log.default.warn([
+                    `The safelist pattern \`${regex}\` doesn't match any Tailwind CSS classes.`,
+                    "Fix this pattern or remove it from your `safelist` configuration.",
+                    "https://tailwindcss.com/docs/content-configuration#safelisting-classes"
+                ]);
+            }
+        }
+    }
+    var _context_tailwindConfig_darkMode, _concat_;
+    let darkClassName = (_concat_ = [].concat((_context_tailwindConfig_darkMode = context.tailwindConfig.darkMode) !== null && _context_tailwindConfig_darkMode !== void 0 ? _context_tailwindConfig_darkMode : "media")[1]) !== null && _concat_ !== void 0 ? _concat_ : "dark";
+    // A list of utilities that are used by certain Tailwind CSS utilities but
+    // that don't exist on their own. This will result in them "not existing" and
+    // sorting could be weird since you still require them in order to make the
+    // host utilities work properly. (Thanks Biology)
+    let parasiteUtilities = [
+        prefix(context, darkClassName),
+        prefix(context, "group"),
+        prefix(context, "peer")
+    ];
+    context.getClassOrder = function getClassOrder(classes) {
+        // Sort classes so they're ordered in a deterministic manner
+        let sorted = [
+            ...classes
+        ].sort((a, z)=>{
+            if (a === z) return 0;
+            if (a < z) return -1;
+            return 1;
+        });
+        // Non-util classes won't be generated, so we default them to null
+        let sortedClassNames = new Map(sorted.map((className)=>[
+                className,
+                null
+            ]));
+        // Sort all classes in order
+        // Non-tailwind classes won't be generated and will be left as `null`
+        let rules = (0, _generateRules.generateRules)(new Set(sorted), context);
+        rules = context.offsets.sort(rules);
+        let idx = BigInt(parasiteUtilities.length);
+        for (const [, rule] of rules){
+            let candidate = rule.raws.tailwind.candidate;
+            var _sortedClassNames_get;
+            // When multiple rules match a candidate
+            // always take the position of the first one
+            sortedClassNames.set(candidate, (_sortedClassNames_get = sortedClassNames.get(candidate)) !== null && _sortedClassNames_get !== void 0 ? _sortedClassNames_get : idx++);
+        }
+        return classes.map((className)=>{
+            var _sortedClassNames_get;
+            let order = (_sortedClassNames_get = sortedClassNames.get(className)) !== null && _sortedClassNames_get !== void 0 ? _sortedClassNames_get : null;
+            let parasiteIndex = parasiteUtilities.indexOf(className);
+            if (order === null && parasiteIndex !== -1) {
+                // This will make sure that it is at the very beginning of the
+                // `components` layer which technically means 'before any
+                // components'.
+                order = BigInt(parasiteIndex);
+            }
+            return [
+                className,
+                order
+            ];
+        });
+    };
+    // Generate a list of strings for autocompletion purposes, e.g.
+    // ['uppercase', 'lowercase', ...]
+    context.getClassList = function getClassList(options = {}) {
+        let output = [];
+        for (let util of classList){
+            if (Array.isArray(util)) {
+                var _utilOptions_types;
+                let [utilName, utilOptions] = util;
+                let negativeClasses = [];
+                var _utilOptions_modifiers;
+                let modifiers = Object.keys((_utilOptions_modifiers = utilOptions === null || utilOptions === void 0 ? void 0 : utilOptions.modifiers) !== null && _utilOptions_modifiers !== void 0 ? _utilOptions_modifiers : {});
+                if (utilOptions === null || utilOptions === void 0 ? void 0 : (_utilOptions_types = utilOptions.types) === null || _utilOptions_types === void 0 ? void 0 : _utilOptions_types.some(({ type  })=>type === "color")) {
+                    var _context_tailwindConfig_theme_opacity;
+                    modifiers.push(...Object.keys((_context_tailwindConfig_theme_opacity = context.tailwindConfig.theme.opacity) !== null && _context_tailwindConfig_theme_opacity !== void 0 ? _context_tailwindConfig_theme_opacity : {}));
+                }
+                let metadata = {
+                    modifiers
+                };
+                let includeMetadata = options.includeMetadata && modifiers.length > 0;
+                var _utilOptions_values;
+                for (let [key, value] of Object.entries((_utilOptions_values = utilOptions === null || utilOptions === void 0 ? void 0 : utilOptions.values) !== null && _utilOptions_values !== void 0 ? _utilOptions_values : {})){
+                    // Ignore undefined and null values
+                    if (value == null) {
+                        continue;
+                    }
+                    let cls = (0, _nameClass.formatClass)(utilName, key);
+                    output.push(includeMetadata ? [
+                        cls,
+                        metadata
+                    ] : cls);
+                    if ((utilOptions === null || utilOptions === void 0 ? void 0 : utilOptions.supportsNegativeValues) && (0, _negateValue.default)(value)) {
+                        let cls = (0, _nameClass.formatClass)(utilName, `-${key}`);
+                        negativeClasses.push(includeMetadata ? [
+                            cls,
+                            metadata
+                        ] : cls);
+                    }
+                }
+                output.push(...negativeClasses);
+            } else {
+                output.push(util);
+            }
+        }
+        return output;
+    };
+    // Generate a list of available variants with meta information of the type of variant.
+    context.getVariants = function getVariants() {
+        let result = [];
+        for (let [name, options] of context.variantOptions.entries()){
+            if (options.variantInfo === VARIANT_INFO.Base) continue;
+            var _options_values;
+            result.push({
+                name,
+                isArbitrary: options.type === Symbol.for("MATCH_VARIANT"),
+                values: Object.keys((_options_values = options.values) !== null && _options_values !== void 0 ? _options_values : {}),
+                hasDash: name !== "@",
+                selectors ({ modifier , value  } = {}) {
+                    let candidate = "__TAILWIND_PLACEHOLDER__";
+                    let rule = _postcss.default.rule({
+                        selector: `.${candidate}`
+                    });
+                    let container = _postcss.default.root({
+                        nodes: [
+                            rule.clone()
+                        ]
+                    });
+                    let before = container.toString();
+                    var _context_variantMap_get;
+                    let fns = ((_context_variantMap_get = context.variantMap.get(name)) !== null && _context_variantMap_get !== void 0 ? _context_variantMap_get : []).flatMap(([_, fn])=>fn);
+                    let formatStrings = [];
+                    for (let fn of fns){
+                        var _options_values;
+                        let localFormatStrings = [];
+                        var _options_values_value;
+                        let api = {
+                            args: {
+                                modifier,
+                                value: (_options_values_value = (_options_values = options.values) === null || _options_values === void 0 ? void 0 : _options_values[value]) !== null && _options_values_value !== void 0 ? _options_values_value : value
+                            },
+                            separator: context.tailwindConfig.separator,
+                            modifySelectors (modifierFunction) {
+                                // Run the modifierFunction over each rule
+                                container.each((rule)=>{
+                                    if (rule.type !== "rule") {
+                                        return;
+                                    }
+                                    rule.selectors = rule.selectors.map((selector)=>{
+                                        return modifierFunction({
+                                            get className () {
+                                                return (0, _generateRules.getClassNameFromSelector)(selector);
+                                            },
+                                            selector
+                                        });
+                                    });
+                                });
+                                return container;
+                            },
+                            format (str) {
+                                localFormatStrings.push(str);
+                            },
+                            wrap (wrapper) {
+                                localFormatStrings.push(`@${wrapper.name} ${wrapper.params} { & }`);
+                            },
+                            container
+                        };
+                        let ruleWithVariant = fn(api);
+                        if (localFormatStrings.length > 0) {
+                            formatStrings.push(localFormatStrings);
+                        }
+                        if (Array.isArray(ruleWithVariant)) {
+                            for (let variantFunction of ruleWithVariant){
+                                localFormatStrings = [];
+                                variantFunction(api);
+                                formatStrings.push(localFormatStrings);
+                            }
+                        }
+                    }
+                    // Reverse engineer the result of the `container`
+                    let manualFormatStrings = [];
+                    let after = container.toString();
+                    if (before !== after) {
+                        // Figure out all selectors
+                        container.walkRules((rule)=>{
+                            let modified = rule.selector;
+                            // Rebuild the base selector, this is what plugin authors would do
+                            // as well. E.g.: `${variant}${separator}${className}`.
+                            // However, plugin authors probably also prepend or append certain
+                            // classes, pseudos, ids, ...
+                            let rebuiltBase = (0, _postcssselectorparser.default)((selectors)=>{
+                                selectors.walkClasses((classNode)=>{
+                                    classNode.value = `${name}${context.tailwindConfig.separator}${classNode.value}`;
+                                });
+                            }).processSync(modified);
+                            // Now that we know the original selector, the new selector, and
+                            // the rebuild part in between, we can replace the part that plugin
+                            // authors need to rebuild with `&`, and eventually store it in the
+                            // collectedFormats. Similar to what `format('...')` would do.
+                            //
+                            // E.g.:
+                            //                   variant: foo
+                            //                  selector: .markdown > p
+                            //      modified (by plugin): .foo .foo\\:markdown > p
+                            //    rebuiltBase (internal): .foo\\:markdown > p
+                            //                    format: .foo &
+                            manualFormatStrings.push(modified.replace(rebuiltBase, "&").replace(candidate, "&"));
+                        });
+                        // Figure out all atrules
+                        container.walkAtRules((atrule)=>{
+                            manualFormatStrings.push(`@${atrule.name} (${atrule.params}) { & }`);
+                        });
+                    }
+                    var _options_values1;
+                    let isArbitraryVariant = !(value in ((_options_values1 = options.values) !== null && _options_values1 !== void 0 ? _options_values1 : {}));
+                    var _options_INTERNAL_FEATURES;
+                    let internalFeatures = (_options_INTERNAL_FEATURES = options[INTERNAL_FEATURES]) !== null && _options_INTERNAL_FEATURES !== void 0 ? _options_INTERNAL_FEATURES : {};
+                    let respectPrefix = (()=>{
+                        if (isArbitraryVariant) return false;
+                        if (internalFeatures.respectPrefix === false) return false;
+                        return true;
+                    })();
+                    formatStrings = formatStrings.map((format)=>format.map((str)=>({
+                                format: str,
+                                respectPrefix
+                            })));
+                    manualFormatStrings = manualFormatStrings.map((format)=>({
+                            format,
+                            respectPrefix
+                        }));
+                    let opts = {
+                        candidate,
+                        context
+                    };
+                    let result = formatStrings.map((formats)=>(0, _formatVariantSelector.finalizeSelector)(`.${candidate}`, (0, _formatVariantSelector.formatVariantSelector)(formats, opts), opts).replace(`.${candidate}`, "&").replace("{ & }", "").trim());
+                    if (manualFormatStrings.length > 0) {
+                        result.push((0, _formatVariantSelector.formatVariantSelector)(manualFormatStrings, opts).toString().replace(`.${candidate}`, "&"));
+                    }
+                    return result;
+                }
+            });
+        }
+        return result;
+    };
+}
+/**
+ * Mark as class as retroactively invalid
+ *
+ *
+ * @param {string} candidate
+ */ function markInvalidUtilityCandidate(context, candidate) {
+    if (!context.classCache.has(candidate)) {
+        return;
+    }
+    // Mark this as not being a real utility
+    context.notClassCache.add(candidate);
+    // Remove it from any candidate-specific caches
+    context.classCache.delete(candidate);
+    context.applyClassCache.delete(candidate);
+    context.candidateRuleMap.delete(candidate);
+    context.candidateRuleCache.delete(candidate);
+    // Ensure the stylesheet gets rebuilt
+    context.stylesheetCache = null;
+}
+/**
+ * Mark as class as retroactively invalid
+ *
+ * @param {import('postcss').Node} node
+ */ function markInvalidUtilityNode(context, node) {
+    let candidate = node.raws.tailwind.candidate;
+    if (!candidate) {
+        return;
+    }
+    for (const entry of context.ruleCache){
+        if (entry[1].raws.tailwind.candidate === candidate) {
+            context.ruleCache.delete(entry);
+        // context.postCssNodeCache.delete(node)
+        }
+    }
+    markInvalidUtilityCandidate(context, candidate);
+}
+function createContext(tailwindConfig, changedContent = [], root = _postcss.default.root()) {
+    var _tailwindConfig_blocklist;
+    let context = {
+        disposables: [],
+        ruleCache: new Set(),
+        candidateRuleCache: new Map(),
+        classCache: new Map(),
+        applyClassCache: new Map(),
+        // Seed the not class cache with the blocklist (which is only strings)
+        notClassCache: new Set((_tailwindConfig_blocklist = tailwindConfig.blocklist) !== null && _tailwindConfig_blocklist !== void 0 ? _tailwindConfig_blocklist : []),
+        postCssNodeCache: new Map(),
+        candidateRuleMap: new Map(),
+        tailwindConfig,
+        changedContent: changedContent,
+        variantMap: new Map(),
+        stylesheetCache: null,
+        variantOptions: new Map(),
+        markInvalidUtilityCandidate: (candidate)=>markInvalidUtilityCandidate(context, candidate),
+        markInvalidUtilityNode: (node)=>markInvalidUtilityNode(context, node)
+    };
+    let resolvedPlugins = resolvePlugins(context, root);
+    registerPlugins(resolvedPlugins, context);
+    return context;
+}
+let contextMap = _sharedState.contextMap;
+let configContextMap = _sharedState.configContextMap;
+let contextSourcesMap = _sharedState.contextSourcesMap;
+function getContext(root, result, tailwindConfig, userConfigPath, tailwindConfigHash, contextDependencies) {
+    let sourcePath = result.opts.from;
+    let isConfigFile = userConfigPath !== null;
+    _sharedState.env.DEBUG && console.log("Source path:", sourcePath);
+    let existingContext;
+    if (isConfigFile && contextMap.has(sourcePath)) {
+        existingContext = contextMap.get(sourcePath);
+    } else if (configContextMap.has(tailwindConfigHash)) {
+        let context = configContextMap.get(tailwindConfigHash);
+        contextSourcesMap.get(context).add(sourcePath);
+        contextMap.set(sourcePath, context);
+        existingContext = context;
+    }
+    let cssDidChange = (0, _cacheInvalidation.hasContentChanged)(sourcePath, root);
+    // If there's already a context in the cache and we don't need to
+    // reset the context, return the cached context.
+    if (existingContext) {
+        let [contextDependenciesChanged, mtimesToCommit] = trackModified([
+            ...contextDependencies
+        ], getFileModifiedMap(existingContext));
+        if (!contextDependenciesChanged && !cssDidChange) {
+            return [
+                existingContext,
+                false,
+                mtimesToCommit
+            ];
+        }
+    }
+    // If this source is in the context map, get the old context.
+    // Remove this source from the context sources for the old context,
+    // and clean up that context if no one else is using it. This can be
+    // called by many processes in rapid succession, so we check for presence
+    // first because the first process to run this code will wipe it out first.
+    if (contextMap.has(sourcePath)) {
+        let oldContext = contextMap.get(sourcePath);
+        if (contextSourcesMap.has(oldContext)) {
+            contextSourcesMap.get(oldContext).delete(sourcePath);
+            if (contextSourcesMap.get(oldContext).size === 0) {
+                contextSourcesMap.delete(oldContext);
+                for (let [tailwindConfigHash, context] of configContextMap){
+                    if (context === oldContext) {
+                        configContextMap.delete(tailwindConfigHash);
+                    }
+                }
+                for (let disposable of oldContext.disposables.splice(0)){
+                    disposable(oldContext);
+                }
+            }
+        }
+    }
+    _sharedState.env.DEBUG && console.log("Setting up new context...");
+    let context = createContext(tailwindConfig, [], root);
+    Object.assign(context, {
+        userConfigPath
+    });
+    let [, mtimesToCommit] = trackModified([
+        ...contextDependencies
+    ], getFileModifiedMap(context));
+    // ---
+    // Update all context tracking state
+    configContextMap.set(tailwindConfigHash, context);
+    contextMap.set(sourcePath, context);
+    if (!contextSourcesMap.has(context)) {
+        contextSourcesMap.set(context, new Set());
+    }
+    contextSourcesMap.get(context).add(sourcePath);
+    return [
+        context,
+        true,
+        mtimesToCommit
+    ];
+}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         import fs from 'fs'
+import url from 'url'
+import postcss from 'postcss'
+import dlv from 'dlv'
+import selectorParser from 'postcss-selector-parser'
+
+import transformThemeValue from '../util/transformThemeValue'
+import parseObjectStyles from '../util/parseObjectStyles'
+import prefixSelector from '../util/prefixSelector'
+import isPlainObject from '../util/isPlainObject'
+import escapeClassName from '../util/escapeClassName'
+import nameClass, { formatClass } from '../util/nameClass'
+import { coerceValue } from '../util/pluginUtils'
+import { variantPlugins, corePlugins } from '../corePlugins'
+import * as sharedState from './sharedState'
+import { env } from './sharedState'
+import { toPath } from '../util/toPath'
+import log from '../util/log'
+import negateValue from '../util/negateValue'
+import isSyntacticallyValidPropertyValue from '../util/isSyntacticallyValidPropertyValue'
+import { generateRules, getClassNameFromSelector } from './generateRules'
+import { hasContentChanged } from './cacheInvalidation.js'
+import { Offsets } from './offsets.js'
+import { flagEnabled } from '../featureFlags.js'
+import { finalizeSelector, formatVariantSelector } from '../util/formatVariantSelector'
+
+export const INTERNAL_FEATURES = Symbol()
+
+const VARIANT_TYPES = {
+  AddVariant: Symbol.for('ADD_VARIANT'),
+  MatchVariant: Symbol.for('MATCH_VARIANT'),
+}
+
+const VARIANT_INFO = {
+  Base: 1 << 0,
+  Dynamic: 1 << 1,
+}
+
+function prefix(context, selector) {
+  let prefix = context.tailwindConfig.prefix
+  return typeof prefix === 'function' ? prefix(selector) : prefix + selector
+}
+
+function normalizeOptionTypes({ type = 'any', ...options }) {
+  let types = [].concat(type)
+
+  return {
+    ...options,
+    types: types.map((type) => {
+      if (Array.isArray(type)) {
+        return { type: type[0], ...type[1] }
+      }
+      return { type, preferOnConflict: false }
+    }),
+  }
+}
+
+function parseVariantFormatString(input) {
+  /** @type {string[]} */
+  let parts = []
+
+  // When parsing whitespace around special characters are insignificant
+  // However, _inside_ of a variant they could be
+  // Because the selector could look like this
+  // @media { &[data-name="foo bar"] }
+  // This is why we do not skip whitespace
+
+  let current = ''
+  let depth = 0
+
+  for (let idx = 0; idx < input.length; idx++) {
+    let char = input[idx]
+
+    if (char === '\\') {
+      // Escaped characters are not special
+      current += '\\' + input[++idx]
+    } else if (char === '{') {
+      // Nested rule: start
+      ++depth
+      parts.push(current.trim())
+      current = ''
+    } else if (char === '}') {
+      // Nested rule: end
+      if (--depth < 0) {
+        throw new Error(`Your { and } are unbalanced.`)
+      }
+
+      parts.push(current.trim())
+      current = ''
+    } else {
+      // Normal character
+      current += char
+    }
+  }
+
+  if (current.length > 0) {
+    parts.push(current.trim())
+  }
+
+  parts = parts.filter((part) => part !== '')
+
+  return parts
+}
+
+function insertInto(list, value, { before = [] } = {}) {
+  before = [].concat(before)
+
+  if (before.length <= 0) {
+    list.push(value)
+    return
+  }
+
+  let idx = list.length - 1
+  for (let other of before) {
+    let iidx = list.indexOf(other)
+    if (iidx === -1) continue
+    idx = Math.min(idx, iidx)
+  }
+
+  list.splice(idx, 0, value)
+}
+
+function parseStyles(styles) {
+  if (!Array.isArray(styles)) {
+    return parseStyles([styles])
+  }
+
+  return styles.flatMap((style) => {
+    let isNode = !Array.isArray(style) && !isPlainObject(style)
+    return isNode ? style : parseObjectStyles(style)
+  })
+}
+
+function getClasses(selector, mutate) {
+  let parser = selectorParser((selectors) => {
+    let allClasses = []
+
+    if (mutate) {
+      mutate(selectors)
+    }
+
+    selectors.walkClasses((classNode) => {
+      allClasses.push(classNode.value)
+    })
+
+    return allClasses
+  })
+  return parser.transformSync(selector)
+}
+
+function extractCandidates(node, state = { containsNonOnDemandable: false }, depth = 0) {
+  let classes = []
+
+  // Handle normal rules
+  if (node.type === 'rule') {
+    // Ignore everything inside a :not(...). This allows you to write code like
+    // `div:not(.foo)`. If `.foo` is never found in your code, then we used to
+    // not generated it. But now we will ignore everything inside a `:not`, so
+    // that it still gets generated.
+    function ignoreNot(selectors) {
+      selectors.walkPseudos((pseudo) => {
+        if (pseudo.value === ':not') {
+          pseudo.remove()
+        }
+      })
+    }
+
+    for (let selector of node.selectors) {
+      let classCandidates = getClasses(selector, ignoreNot)
+      // At least one of the selectors contains non-"on-demandable" candidates.
+      if (classCandidates.length === 0) {
+        state.containsNonOnDemandable = true
+      }
+
+      for (let classCandidate of classCandidates) {
+        classes.push(classCandidate)
+      }
+    }
+  }
+
+  // Handle at-rules (which contains nested rules)
+  else if (node.type === 'atrule') {
+    node.walkRules((rule) => {
+      for (let classCandidate of rule.selectors.flatMap((selector) => getClasses(selector))) {
+        classes.push(classCandidate)
+      }
+    })
+  }
+
+  if (depth === 0) {
+    return [state.containsNonOnDemandable || classes.length === 0, classes]
+  }
+
+  return classes
+}
+
+function withIdentifiers(styles) {
+  return parseStyles(styles).flatMap((node) => {
+    let nodeMap = new Map()
+    let [containsNonOnDemandableSelectors, candidates] = extractCandidates(node)
+
+    // If this isn't "on-demandable", assign it a universal candidate to always include it.
+    if (containsNonOnDemandableSelectors) {
+      candidates.unshift(sharedState.NOT_ON_DEMAND)
+    }
+
+    // However, it could be that it also contains "on-demandable" candidates.
+    // E.g.: `span, .foo {}`, in that case it should still be possible to use
+    // `@apply foo` for example.
+    return candidates.map((c) => {
+      if (!nodeMap.has(node)) {
+        nodeMap.set(node, node)
+      }
+      return [c, nodeMap.get(node)]
+    })
+  })
+}
+
+export function isValidVariantFormatString(format) {
+  return format.startsWith('@') || format.includes('&')
+}
+
+export function parseVariant(variant) {
+  variant = variant
+    .replace(/\n+/g, '')
+    .replace(/\s{1,}/g, ' ')
+    .trim()
+
+  let fns = parseVariantFormatString(variant)
+    .map((str) => {
+      if (!str.startsWith('@')) {
+        return ({ format }) => format(str)
+      }
+
+      let [, name, params] = /@(\S*)( .+|[({].*)?/g.exec(str)
+      return ({ wrap }) => wrap(postcss.atRule({ name, params: params?.trim() ?? '' }))
+    })
+    .reverse()
+
+  return (api) => {
+    for (let fn of fns) {
+      fn(api)
+    }
+  }
+}
+
+/**
+ *
+ * @param {any} tailwindConfig
+ * @param {any} context
+ * @param {object} param2
+ * @param {Offsets} param2.offsets
+ */
+function buildPluginApi(tailwindConfig, context, { variantList, variantMap, offsets, classList }) {
+  function getConfigValue(path, defaultValue) {
+    return path ? dlv(tailwindConfig, path, defaultValue) : tailwindConfig
+  }
+
+  function applyConfiguredPrefix(selector) {
+    return prefixSelector(tailwindConfig.prefix, selector)
+  }
+
+  function prefixIdentifier(identifier, options) {
+    if (identifier === sharedState.NOT_ON_DEMAND) {
+      return sharedState.NOT_ON_DEMAND
+    }
+
+    if (!options.respectPrefix) {
+      return identifier
+    }
+
+    return context.tailwindConfig.prefix + identifier
+  }
+
+  function resolveThemeValue(path, defaultValue, opts = {}) {
+    let parts = toPath(path)
+    let value = getConfigValue(['theme', ...parts], defaultValue)
+    return transformThemeValue(parts[0])(value, opts)
+  }
+
+  let variantIdentifier = 0
+  let api = {
+    postcss,
+    prefix: applyConfiguredPrefix,
+    e: escapeClassName,
+    config: getConfigValue,
+    theme: resolveThemeValue,
+    corePlugins: (path) => {
+      if (Array.isArray(tailwindConfig.corePlugins)) {
+        return tailwindConfig.corePlugins.includes(path)
+      }
+
+      return getConfigValue(['corePlugins', path], true)
+    },
+    variants: () => {
+      // Preserved for backwards compatibility but not used in v3.0+
+      return []
+    },
+    addBase(base) {
+      for (let [identifier, rule] of withIdentifiers(base)) {
+        let prefixedIdentifier = prefixIdentifier(identifier, {})
+        let offset = offsets.create('base')
+
+        if (!context.candidateRuleMap.has(prefixedIdentifier)) {
+          context.candidateRuleMap.set(prefixedIdentifier, [])
+        }
+
+        context.candidateRuleMap
+          .get(prefixedIdentifier)
+          .push([{ sort: offset, layer: 'base' }, rule])
+      }
+    },
+    /**
+     * @param {string} group
+     * @param {Record<string, string | string[]>} declarations
+     */
+    addDefaults(group, declarations) {
+      const groups = {
+        [`@defaults ${group}`]: declarations,
+      }
+
+      for (let [identifier, rule] of withIdentifiers(groups)) {
+        let prefixedIdentifier = prefixIdentifier(identifier, {})
+
+        if (!context.candidateRuleMap.has(prefixedIdentifier)) {
+          context.candidateRuleMap.set(prefixedIdentifier, [])
+        }
+
+        context.candidateRuleMap
+          .get(prefixedIdentifier)
+          .push([{ sort: offsets.create('defaults'), layer: 'defaults' }, rule])
+      }
+    },
+    addComponents(components, options) {
+      let defaultOptions = {
+        preserveSource: false,
+        respectPrefix: true,
+        respectImportant: false,
+      }
+
+      options = Object.assign({}, defaultOptions, Array.isArray(options) ? {} : options)
+
+      for (let [identifier, rule] of withIdentifiers(components)) {
+        let prefixedIdentifier = prefixIdentifier(identifier, options)
+
+        classList.add(prefixedIdentifier)
+
+        if (!context.candidateRuleMap.has(prefixedIdentifier)) {
+          context.candidateRuleMap.set(prefixedIdentifier, [])
+        }
+
+        context.candidateRuleMap
+          .get(prefixedIdentifier)
+          .push([{ sort: offsets.create('components'), layer: 'components', options }, rule])
+      }
+    },
+    addUtilities(utilities, options) {
+      let defaultOptions = {
+        preserveSource: false,
+        respectPrefix: true,
+        respectImportant: true,
+      }
+
+      options = Object.assign({}, defaultOptions, Array.isArray(options) ? {} : options)
+
+      for (let [identifier, rule] of withIdentifiers(utilities)) {
+        let prefixedIdentifier = prefixIdentifier(identifier, options)
+
+        classList.add(prefixedIdentifier)
+
+        if (!context.candidateRuleMap.has(prefixedIdentifier)) {
+          context.candidateRuleMap.set(prefixedIdentifier, [])
+        }
+
+        context.candidateRuleMap
+          .get(prefixedIdentifier)
+          .push([{ sort: offsets.create('utilities'), layer: 'utilities', options }, rule])
+      }
+    },
+    matchUtilities: function (utilities, options) {
+      let defaultOptions = {
+        respectPrefix: true,
+        respectImportant: true,
+        modifiers: false,
+      }
+
+      options = normalizeOptionTypes({ ...defaultOptions, ...options })
+
+      let offset = offsets.create('utilities')
+
+      for (let identifier in utilities) {
+        let prefixedIdentifier = prefixIdentifier(identifier, options)
+        let rule = utilities[identifier]
+
+        classList.add([prefixedIdentifier, options])
+
+        function wrapped(modifier, { isOnlyPlugin }) {
+          let [value, coercedType, utilityModifier] = coerceValue(
+            options.types,
+            modifier,
+            options,
+            tailwindConfig
+          )
+
+          if (value === undefined) {
+            return []
+          }
+
+          if (!options.types.some(({ type }) => type === coercedType)) {
+            if (isOnlyPlugin) {
+              log.warn([
+                `Unnecessary typehint \`${coercedType}\` in \`${identifier}-${modifier}\`.`,
+                `You can safely update it to \`${identifier}-${modifier.replace(
+                  coercedType + ':',
+                  ''
+                )}\`.`,
+              ])
+            } else {
+              return []
+            }
+          }
+
+          if (!isSyntacticallyValidPropertyValue(value)) {
+            return []
+          }
+
+          let extras = {
+            get modifier() {
+              if (!options.modifiers) {
+                log.warn(`modifier-used-without-options-for-${identifier}`, [
+                  'Your plugin must set `modifiers: true` in its options to support modifiers.',
+                ])
+              }
+
+              return utilityModifier
+            },
+          }
+
+          let modifiersEnabled = flagEnabled(tailwindConfig, 'generalizedModifiers')
+
+          let ruleSets = []
+            .concat(modifiersEnabled ? rule(value, extras) : rule(value))
+            .filter(Boolean)
+            .map((declaration) => ({
+              [nameClass(identifier, modifier)]: declaration,
+            }))
+
+          return ruleSets
+        }
+
+        let withOffsets = [{ sort: offset, layer: 'utilities', options }, wrapped]
+
+        if (!context.candidateRuleMap.has(prefixedIdentifier)) {
+          context.candidateRuleMap.set(prefixedIdentifier, [])
+        }
+
+        context.candidateRuleMap.get(prefixedIdentifier).push(withOffsets)
+      }
+    },
+    matchComponents: function (components, options) {
+      let defaultOptions = {
+        respectPrefix: true,
+        respectImportant: false,
+        modifiers: false,
+      }
+
+      options = normalizeOptionTypes({ ...defaultOptions, ...options })
+
+      let offset = offsets.create('components')
+
+      for (let identifier in components) {
+        let prefixedIdentifier = prefixIdentifier(identifier, options)
+        let rule = components[identifier]
+
+        classList.add([prefixedIdentifier, options])
+
+        function wrapped(modifier, { isOnlyPlugin }) {
+          let [value, coercedType, utilityModifier] = coerceValue(
+            options.types,
+            modifier,
+            options,
+            tailwindConfig
+          )
+
+          if (value === undefined) {
+            return []
+          }
+
+          if (!options.types.some(({ type }) => type === coercedType)) {
+            if (isOnlyPlugin) {
+              log.warn([
+                `Unnecessary typehint \`${coercedType}\` in \`${identifier}-${modifier}\`.`,
+                `You can safely update it to \`${identifier}-${modifier.replace(
+                  coercedType + ':',
+                  ''
+                )}\`.`,
+              ])
+            } else {
+              return []
+            }
+          }
+
+          if (!isSyntacticallyValidPropertyValue(value)) {
+            return []
+          }
+
+          let extras = {
+            get modifier() {
+              if (!options.modifiers) {
+                log.warn(`modifier-used-without-options-for-${identifier}`, [
+                  'Your plugin must set `modifiers: true` in its options to support modifiers.',
+                ])
+              }
+
+              return utilityModifier
+            },
+          }
+
+          let modifiersEnabled = flagEnabled(tailwindConfig, 'generalizedModifiers')
+
+          let ruleSets = []
+            .concat(modifiersEnabled ? rule(value, extras) : rule(value))
+            .filter(Boolean)
+            .map((declaration) => ({
+              [nameClass(identifier, modifier)]: declaration,
+            }))
+
+          return ruleSets
+        }
+
+        let withOffsets = [{ sort: offset, layer: 'components', options }, wrapped]
+
+        if (!context.candidateRuleMap.has(prefixedIdentifier)) {
+          context.candidateRuleMap.set(prefixedIdentifier, [])
+        }
+
+        context.candidateRuleMap.get(prefixedIdentifier).push(withOffsets)
+      }
+    },
+    addVariant(variantName, variantFunctions, options = {}) {
+      variantFunctions = [].concat(variantFunctions).map((variantFunction) => {
+        if (typeof variantFunction !== 'string') {
+          // Safelist public API functions
+          return (api = {}) => {
+            let { args, modifySelectors, container, separator, wrap, format } = api
+            let result = variantFunction(
+              Object.assign(
+                { modifySelectors, container, separator },
+                options.type === VARIANT_TYPES.MatchVariant && { args, wrap, format }
+              )
+            )
+
+            if (typeof result === 'string' && !isValidVariantFormatString(result)) {
+              throw new Error(
+                `Your custom variant \`${variantName}\` has an invalid format string. Make sure it's an at-rule or contains a \`&\` placeholder.`
+              )
+            }
+
+            if (Array.isArray(result)) {
+              return result
+                .filter((variant) => typeof variant === 'string')
+                .map((variant) => parseVariant(variant))
+            }
+
+            // result may be undefined with legacy variants that use APIs like `modifySelectors`
+            // result may also be a postcss node if someone was returning the result from `modifySelectors`
+            return result && typeof result === 'string' && parseVariant(result)(api)
+          }
+        }
+
+        if (!isValidVariantFormatString(variantFunction)) {
+          throw new Error(
+            `Your custom variant \`${variantName}\` has an invalid format string. Make sure it's an at-rule or contains a \`&\` placeholder.`
+          )
+        }
+
+        return parseVariant(variantFunction)
+      })
+
+      insertInto(variantList, variantName, options)
+      variantMap.set(variantName, variantFunctions)
+      context.variantOptions.set(variantName, options)
+    },
+    matchVariant(variant, variantFn, options) {
+      // A unique identifier that "groups" these variants together.
+      // This is for internal use only which is why it is not present in the types
+      let id = options?.id ?? ++variantIdentifier
+      let isSpecial = variant === '@'
+
+      let modifiersEnabled = flagEnabled(tailwindConfig, 'generalizedModifiers')
+
+      for (let [key, value] of Object.entries(options?.values ?? {})) {
+        if (key === 'DEFAULT') continue
+
+        api.addVariant(
+          isSpecial ? `${variant}${key}` : `${variant}-${key}`,
+          ({ args, container }) => {
+            return variantFn(
+              value,
+              modifiersEnabled ? { modifier: args?.modifier, container } : { container }
+            )
+          },
+
+          {
+            ...options,
+            value,
+            id,
+            type: VARIANT_TYPES.MatchVariant,
+            variantInfo: VARIANT_INFO.Base,
+          }
+        )
+      }
+
+      let hasDefault = 'DEFAULT' in (options?.values ?? {})
+
+      api.addVariant(
+        variant,
+        ({ args, container }) => {
+          if (args?.value === sharedState.NONE && !hasDefault) {
+            return null
+          }
+
+          return variantFn(
+            args?.value === sharedState.NONE
+              ? options.values.DEFAULT
+              : // Falling back to args if it is a string, otherwise '' for older intellisense
+                // (JetBrains) plugins.
+                args?.value ?? (typeof args === 'string' ? args : ''),
+            modifiersEnabled ? { modifier: args?.modifier, container } : { container }
+          )
+        },
+        {
+          ...options,
+          id,
+          type: VARIANT_TYPES.MatchVariant,
+          variantInfo: VARIANT_INFO.Dynamic,
+        }
+      )
+    },
+  }
+
+  return api
+}
+
+let fileModifiedMapCache = new WeakMap()
+export function getFileModifiedMap(context) {
+  if (!fileModifiedMapCache.has(context)) {
+    fileModifiedMapCache.set(context, new Map())
+  }
+  return fileModifiedMapCache.get(context)
+}
+
+function trackModified(files, fileModifiedMap) {
+  let changed = false
+  let mtimesToCommit = new Map()
+
+  for (let file of files) {
+    if (!file) continue
+
+    let parsed = url.parse(file)
+    let pathname = parsed.hash ? parsed.href.replace(parsed.hash, '') : parsed.href
+    pathname = parsed.search ? pathname.replace(parsed.search, '') : pathname
+    let newModified = fs.statSync(decodeURIComponent(pathname), { throwIfNoEntry: false })?.mtimeMs
+    if (!newModified) {
+      // It could happen that a file is passed in that doesn't exist. E.g.:
+      // postcss-cli will provide you a fake path when reading from stdin. This
+      // path then looks like /path-to-your-project/stdin In that case we just
+      // want to ignore it and don't track changes at all.
+      continue
+    }
+
+    if (!fileModifiedMap.has(file) || newModified > fileModifiedMap.get(file)) {
+      changed = true
+    }
+
+    mtimesToCommit.set(file, newModified)
+  }
+
+  return [changed, mtimesToCommit]
+}
+
+function extractVariantAtRules(node) {
+  node.walkAtRules((atRule) => {
+    if (['responsive', 'variants'].includes(atRule.name)) {
+      extractVariantAtRules(atRule)
+      atRule.before(atRule.nodes)
+      atRule.remove()
+    }
+  })
+}
+
+function collectLayerPlugins(root) {
+  let layerPlugins = []
+
+  root.each((node) => {
+    if (node.type === 'atrule' && ['responsive', 'variants'].includes(node.name)) {
+      node.name = 'layer'
+      node.params = 'utilities'
+    }
+  })
+
+  // Walk @layer rules and treat them like plugins
+  root.walkAtRules('layer', (layerRule) => {
+    extractVariantAtRules(layerRule)
+
+    if (layerRule.params === 'base') {
+      for (let node of layerRule.nodes) {
+        layerPlugins.push(function ({ addBase }) {
+          addBase(node, { respectPrefix: false })
+        })
+      }
+      layerRule.remove()
+    } else if (layerRule.params === 'components') {
+      for (let node of layerRule.nodes) {
+        layerPlugins.push(function ({ addComponents }) {
+          addComponents(node, { respectPrefix: false, preserveSource: true })
+        })
+      }
+      layerRule.remove()
+    } else if (layerRule.params === 'utilities') {
+      for (let node of layerRule.nodes) {
+        layerPlugins.push(function ({ addUtilities }) {
+          addUtilities(node, { respectPrefix: false, preserveSource: true })
+        })
+      }
+      layerRule.remove()
+    }
+  })
+
+  return layerPlugins
+}
+
+function resolvePlugins(context, root) {
+  let corePluginList = Object.entries({ ...variantPlugins, ...corePlugins })
+    .map(([name, plugin]) => {
+      if (!context.tailwindConfig.corePlugins.includes(name)) {
+        return null
+      }
+
+      return plugin
+    })
+    .filter(Boolean)
+
+  let userPlugins = context.tailwindConfig.plugins.map((plugin) => {
+    if (plugin.__isOptionsFunction) {
+      plugin = plugin()
+    }
+
+    return typeof plugin === 'function' ? plugin : plugin.handler
+  })
+
+  let layerPlugins = collectLayerPlugins(root)
+
+  // TODO: This is a workaround for backwards compatibility, since custom variants
+  // were historically sorted before screen/stackable variants.
+  let beforeVariants = [
+    variantPlugins['pseudoElementVariants'],
+    variantPlugins['pseudoClassVariants'],
+    variantPlugins['ariaVariants'],
+    variantPlugins['dataVariants'],
+  ]
+  let afterVariants = [
+    variantPlugins['supportsVariants'],
+    variantPlugins['directionVariants'],
+    variantPlugins['reducedMotionVariants'],
+    variantPlugins['prefersContrastVariants'],
+    variantPlugins['darkVariants'],
+    variantPlugins['printVariant'],
+    variantPlugins['screenVariants'],
+    variantPlugins['orientationVariants'],
+  ]
+
+  return [...corePluginList, ...beforeVariants, ...userPlugins, ...afterVariants, ...layerPlugins]
+}
+
+function registerPlugins(plugins, context) {
+  let variantList = []
+  let variantMap = new Map()
+  context.variantMap = variantMap
+
+  let offsets = new Offsets()
+  context.offsets = offsets
+
+  let classList = new Set()
+
+  let pluginApi = buildPluginApi(context.tailwindConfig, context, {
+    variantList,
+    variantMap,
+    offsets,
+    classList,
+  })
+
+  for (let plugin of plugins) {
+    if (Array.isArray(plugin)) {
+      for (let pluginItem of plugin) {
+        pluginItem(pluginApi)
+      }
+    } else {
+      plugin?.(pluginApi)
+    }
+  }
+
+  // Make sure to record bit masks for every variant
+  offsets.recordVariants(variantList, (variant) => variantMap.get(variant).length)
+
+  // Build variantMap
+  for (let [variantName, variantFunctions] of variantMap.entries()) {
+    context.variantMap.set(
+      variantName,
+      variantFunctions.map((variantFunction, idx) => [
+        offsets.forVariant(variantName, idx),
+        variantFunction,
+      ])
+    )
+  }
+
+  let safelist = (context.tailwindConfig.safelist ?? []).filter(Boolean)
+  if (safelist.length > 0) {
+    let checks = []
+
+    for (let value of safelist) {
+      if (typeof value === 'string') {
+        context.changedContent.push({ content: value, extension: 'html' })
+        continue
+      }
+
+      if (value instanceof RegExp) {
+        log.warn('root-regex', [
+          'Regular expressions in `safelist` work differently in Tailwind CSS v3.0.',
+          'Update your `safelist` configuration to eliminate this warning.',
+          'https://tailwindcss.com/docs/content-configuration#safelisting-classes',
+        ])
+        continue
+      }
+
+      checks.push(value)
+    }
+
+    if (checks.length > 0) {
+      let patternMatchingCount = new Map()
+      let prefixLength = context.tailwindConfig.prefix.length
+      let checkImportantUtils = checks.some((check) => check.pattern.source.includes('!'))
+
+      for (let util of classList) {
+        let utils = Array.isArray(util)
+          ? (() => {
+              let [utilName, options] = util
+              let values = Object.keys(options?.values ?? {})
+              let classes = values.map((value) => formatClass(utilName, value))
+
+              if (options?.supportsNegativeValues) {
+                // This is the normal negated version
+                // e.g. `-inset-1` or `-tw-inset-1`
+                classes = [...classes, ...classes.map((cls) => '-' + cls)]
+
+                // This is the negated version *after* the prefix
+                // e.g. `tw--inset-1`
+                // The prefix is already attached to util name
+                // So we add the negative after the prefix
+                classes = [
+                  ...classes,
+                  ...classes.map(
+                    (cls) => cls.slice(0, prefixLength) + '-' + cls.slice(prefixLength)
+                  ),
+                ]
+              }
+
+              if (options.types.some(({ type }) => type === 'color')) {
+                classes = [
+                  ...classes,
+                  ...classes.flatMap((cls) =>
+                    Object.keys(context.tailwindConfig.theme.opacity).map(
+                      (opacity) => `${cls}/${opacity}`
+                    )
+                  ),
+                ]
+              }
+
+              if (checkImportantUtils && options?.respectImportant) {
+                classes = [...classes, ...classes.map((cls) => '!' + cls)]
+              }
+
+              return classes
+            })()
+          : [util]
+
+        for (let util of utils) {
+          for (let { pattern, variants = [] } of checks) {
+            // RegExp with the /g flag are stateful, so let's reset the last
+            // index pointer to reset the state.
+            pattern.lastIndex = 0
+
+            if (!patternMatchingCount.has(pattern)) {
+              patternMatchingCount.set(pattern, 0)
+            }
+
+            if (!pattern.test(util)) continue
+
+            patternMatchingCount.set(pattern, patternMatchingCount.get(pattern) + 1)
+
+            context.changedContent.push({ content: util, extension: 'html' })
+            for (let variant of variants) {
+              context.changedContent.push({
+                content: variant + context.tailwindConfig.separator + util,
+                extension: 'html',
+              })
+            }
+          }
+        }
+      }
+
+      for (let [regex, count] of patternMatchingCount.entries()) {
+        if (count !== 0) continue
+
+        log.warn([
+          `The safelist pattern \`${regex}\` doesn't match any Tailwind CSS classes.`,
+          'Fix this pattern or remove it from your `safelist` configuration.',
+          'https://tailwindcss.com/docs/content-configuration#safelisting-classes',
+        ])
+      }
+    }
+  }
+
+  let darkClassName = [].concat(context.tailwindConfig.darkMode ?? 'media')[1] ?? 'dark'
+
+  // A list of utilities that are used by certain Tailwind CSS utilities but
+  // that don't exist on their own. This will result in them "not existing" and
+  // sorting could be weird since you still require them in order to make the
+  // host utilities work properly. (Thanks Biology)
+  let parasiteUtilities = [
+    prefix(context, darkClassName),
+    prefix(context, 'group'),
+    prefix(context, 'peer'),
+  ]
+  context.getClassOrder = function getClassOrder(classes) {
+    // Sort classes so they're ordered in a deterministic manner
+    let sorted = [...classes].sort((a, z) => {
+      if (a === z) return 0
+      if (a < z) return -1
+      return 1
+    })
+
+    // Non-util classes won't be generated, so we default them to null
+    let sortedClassNames = new Map(sorted.map((className) => [className, null]))
+
+    // Sort all classes in order
+    // Non-tailwind classes won't be generated and will be left as `null`
+    let rules = generateRules(new Set(sorted), context)
+    rules = context.offsets.sort(rules)
+
+    let idx = BigInt(parasiteUtilities.length)
+
+    for (const [, rule] of rules) {
+      let candidate = rule.raws.tailwind.candidate
+
+      // When multiple rules match a candidate
+      // always take the position of the first one
+      sortedClassNames.set(candidate, sortedClassNames.get(candidate) ?? idx++)
+    }
+
+    return classes.map((className) => {
+      let order = sortedClassNames.get(className) ?? null
+      let parasiteIndex = parasiteUtilities.indexOf(className)
+
+      if (order === null && parasiteIndex !== -1) {
+        // This will make sure that it is at the very beginning of the
+        // `components` layer which technically means 'before any
+        // components'.
+        order = BigInt(parasiteIndex)
+      }
+
+      return [className, order]
+    })
+  }
+
+  // Generate a list of strings for autocompletion purposes, e.g.
+  // ['uppercase', 'lowercase', ...]
+  context.getClassList = function getClassList(options = {}) {
+    let output = []
+
+    for (let util of classList) {
+      if (Array.isArray(util)) {
+        let [utilName, utilOptions] = util
+        let negativeClasses = []
+
+        let modifiers = Object.keys(utilOptions?.modifiers ?? {})
+
+        if (utilOptions?.types?.some(({ type }) => type === 'color')) {
+          modifiers.push(...Object.keys(context.tailwindConfig.theme.opacity ?? {}))
+        }
+
+        let metadata = { modifiers }
+        let includeMetadata = options.includeMetadata && modifiers.length > 0
+
+        for (let [key, value] of Object.entries(utilOptions?.values ?? {})) {
+          // Ignore undefined and null values
+          if (value == null) {
+            continue
+          }
+
+          let cls = formatClass(utilName, key)
+          output.push(includeMetadata ? [cls, metadata] : cls)
+
+          if (utilOptions?.supportsNegativeValues && negateValue(value)) {
+            let cls = formatClass(utilName, `-${key}`)
+            negativeClasses.push(includeMetadata ? [cls, metadata] : cls)
+          }
+        }
+
+        output.push(...negativeClasses)
+      } else {
+        output.push(util)
+      }
+    }
+
+    return output
+  }
+
+  // Generate a list of available variants with meta information of the type of variant.
+  context.getVariants = function getVariants() {
+    let result = []
+    for (let [name, options] of context.variantOptions.entries()) {
+      if (options.variantInfo === VARIANT_INFO.Base) continue
+
+      result.push({
+        name,
+        isArbitrary: options.type === Symbol.for('MATCH_VARIANT'),
+        values: Object.keys(options.values ?? {}),
+        hasDash: name !== '@',
+        selectors({ modifier, value } = {}) {
+          let candidate = '__TAILWIND_PLACEHOLDER__'
+
+          let rule = postcss.rule({ selector: `.${candidate}` })
+          let container = postcss.root({ nodes: [rule.clone()] })
+
+          let before = container.toString()
+
+          let fns = (context.variantMap.get(name) ?? []).flatMap(([_, fn]) => fn)
+          let formatStrings = []
+          for (let fn of fns) {
+            let localFormatStrings = []
+
+            let api = {
+              args: { modifier, value: options.values?.[value] ?? value },
+              separator: context.tailwindConfig.separator,
+              modifySelectors(modifierFunction) {
+                // Run the modifierFunction over each rule
+                container.each((rule) => {
+                  if (rule.type !== 'rule') {
+                    return
+                  }
+
+                  rule.selectors = rule.selectors.map((selector) => {
+                    return modifierFunction({
+                      get className() {
+                        return getClassNameFromSelector(selector)
+                      },
+                      selector,
+                    })
+                  })
+                })
+
+                return container
+              },
+              format(str) {
+                localFormatStrings.push(str)
+              },
+              wrap(wrapper) {
+                localFormatStrings.push(`@${wrapper.name} ${wrapper.params} { & }`)
+              },
+              container,
+            }
+
+            let ruleWithVariant = fn(api)
+            if (localFormatStrings.length > 0) {
+              formatStrings.push(localFormatStrings)
+            }
+
+            if (Array.isArray(ruleWithVariant)) {
+              for (let variantFunction of ruleWithVariant) {
+                localFormatStrings = []
+                variantFunction(api)
+                formatStrings.push(localFormatStrings)
+              }
+            }
+          }
+
+          // Reverse engineer the result of the `container`
+          let manualFormatStrings = []
+          let after = container.toString()
+
+          if (before !== after) {
+            // Figure out all selectors
+            container.walkRules((rule) => {
+              let modified = rule.selector
+
+              // Rebuild the base selector, this is what plugin authors would do
+              // as well. E.g.: `${variant}${separator}${className}`.
+              // However, plugin authors probably also prepend or append certain
+              // classes, pseudos, ids, ...
+              let rebuiltBase = selectorParser((selectors) => {
+                selectors.walkClasses((classNode) => {
+                  classNode.value = `${name}${context.tailwindConfig.separator}${classNode.value}`
+                })
+              }).processSync(modified)
+
+              // Now that we know the original selector, the new selector, and
+              // the rebuild part in between, we can replace the part that plugin
+              // authors need to rebuild with `&`, and eventually store it in the
+              // collectedFormats. Similar to what `format('...')` would do.
+              //
+              // E.g.:
+              //                   variant: foo
+              //                  selector: .markdown > p
+              //      modified (by plugin): .foo .foo\\:markdown > p
+              //    rebuiltBase (internal): .foo\\:markdown > p
+              //                    format: .foo &
+              manualFormatStrings.push(modified.replace(rebuiltBase, '&').replace(candidate, '&'))
+            })
+
+            // Figure out all atrules
+            container.walkAtRules((atrule) => {
+              manualFormatStrings.push(`@${atrule.name} (${atrule.params}) { & }`)
+            })
+          }
+
+          let isArbitraryVariant = !(value in (options.values ?? {}))
+          let internalFeatures = options[INTERNAL_FEATURES] ?? {}
+
+          let respectPrefix = (() => {
+            if (isArbitraryVariant) return false
+            if (internalFeatures.respectPrefix === false) return false
+            return true
+          })()
+
+          formatStrings = formatStrings.map((format) =>
+            format.map((str) => ({
+              format: str,
+              respectPrefix,
+            }))
+          )
+
+          manualFormatStrings = manualFormatStrings.map((format) => ({
+            format,
+            respectPrefix,
+          }))
+
+          let opts = {
+            candidate,
+            context,
+          }
+
+          let result = formatStrings.map((formats) =>
+            finalizeSelector(`.${candidate}`, formatVariantSelector(formats, opts), opts)
+              .replace(`.${candidate}`, '&')
+              .replace('{ & }', '')
+              .trim()
+          )
+
+          if (manualFormatStrings.length > 0) {
+            result.push(
+              formatVariantSelector(manualFormatStrings, opts)
+                .toString()
+                .replace(`.${candidate}`, '&')
+            )
+          }
+
+          return result
+        },
+      })
+    }
+
+    return result
+  }
+}
+
+/**
+ * Mark as class as retroactively invalid
+ *
+ *
+ * @param {string} candidate
+ */
+function markInvalidUtilityCandidate(context, candidate) {
+  if (!context.classCache.has(candidate)) {
+    return
+  }
+
+  // Mark this as not being a real utility
+  context.notClassCache.add(candidate)
+
+  // Remove it from any candidate-specific caches
+  context.classCache.delete(candidate)
+  context.applyClassCache.delete(candidate)
+  context.candidateRuleMap.delete(candidate)
+  context.candidateRuleCache.delete(candidate)
+
+  // Ensure the stylesheet gets rebuilt
+  context.stylesheetCache = null
+}
+
+/**
+ * Mark as class as retroactively invalid
+ *
+ * @param {import('postcss').Node} node
+ */
+function markInvalidUtilityNode(context, node) {
+  let candidate = node.raws.tailwind.candidate
+
+  if (!candidate) {
+    return
+  }
+
+  for (const entry of context.ruleCache) {
+    if (entry[1].raws.tailwind.candidate === candidate) {
+      context.ruleCache.delete(entry)
+      // context.postCssNodeCache.delete(node)
+    }
+  }
+
+  markInvalidUtilityCandidate(context, candidate)
+}
+
+export function createContext(tailwindConfig, changedContent = [], root = postcss.root()) {
+  let context = {
+    disposables: [],
+    ruleCache: new Set(),
+    candidateRuleCache: new Map(),
+    classCache: new Map(),
+    applyClassCache: new Map(),
+    // Seed the not class cache with the blocklist (which is only strings)
+    notClassCache: new Set(tailwindConfig.blocklist ?? []),
+    postCssNodeCache: new Map(),
+    candidateRuleMap: new Map(),
+    tailwindConfig,
+    changedContent: changedContent,
+    variantMap: new Map(),
+    stylesheetCache: null,
+    variantOptions: new Map(),
+
+    markInvalidUtilityCandidate: (candidate) => markInvalidUtilityCandidate(context, candidate),
+    markInvalidUtilityNode: (node) => markInvalidUtilityNode(context, node),
+  }
+
+  let resolvedPlugins = resolvePlugins(context, root)
+  registerPlugins(resolvedPlugins, context)
+
+  return context
+}
+
+let contextMap = sharedState.contextMap
+let configContextMap = sharedState.configContextMap
+let contextSourcesMap = sharedState.contextSourcesMap
+
+export function getContext(
+  root,
+  result,
+  tailwindConfig,
+  userConfigPath,
+  tailwindConfigHash,
+  contextDependencies
+) {
+  let sourcePath = result.opts.from
+  let isConfigFile = userConfigPath !== null
+
+  env.DEBUG && console.log('Source path:', sourcePath)
+
+  let existingContext
+
+  if (isConfigFile && contextMap.has(sourcePath)) {
+    existingContext = contextMap.get(sourcePath)
+  } else if (configContextMap.has(tailwindConfigHash)) {
+    let context = configContextMap.get(tailwindConfigHash)
+    contextSourcesMap.get(context).add(sourcePath)
+    contextMap.set(sourcePath, context)
+
+    existingContext = context
+  }
+
+  let cssDidChange = hasContentChanged(sourcePath, root)
+
+  // If there's already a context in the cache and we don't need to
+  // reset the context, return the cached context.
+  if (existingContext) {
+    let [contextDependenciesChanged, mtimesToCommit] = trackModified(
+      [...contextDependencies],
+      getFileModifiedMap(existingContext)
+    )
+    if (!contextDependenciesChanged && !cssDidChange) {
+      return [existingContext, false, mtimesToCommit]
+    }
+  }
+
+  // If this source is in the context map, get the old context.
+  // Remove this source from the context sources for the old context,
+  // and clean up that context if no one else is using it. This can be
+  // called by many processes in rapid succession, so we check for presence
+  // first because the first process to run this code will wipe it out first.
+  if (contextMap.has(sourcePath)) {
+    let oldContext = contextMap.get(sourcePath)
+    if (contextSourcesMap.has(oldContext)) {
+      contextSourcesMap.get(oldContext).delete(sourcePath)
+      if (contextSourcesMap.get(oldContext).size === 0) {
+        contextSourcesMap.delete(oldContext)
+        for (let [tailwindConfigHash, context] of configContextMap) {
+          if (context === oldContext) {
+            configContextMap.delete(tailwindConfigHash)
+          }
+        }
+        for (let disposable of oldContext.disposables.splice(0)) {
+          disposable(oldContext)
+        }
+      }
+    }
+  }
+
+  env.DEBUG && console.log('Setting up new context...')
+
+  let context = createContext(tailwindConfig, [], root)
+
+  Object.assign(context, {
+    userConfigPath,
+  })
+
+  let [, mtimesToCommit] = trackModified([...contextDependencies], getFileModifiedMap(context))
+
+  // ---
+
+  // Update all context tracking state
+
+  configContextMap.set(tailwindConfigHash, context)
+  contextMap.set(sourcePath, context)
+
+  if (!contextSourcesMap.has(context)) {
+    contextSourcesMap.set(context, new Set())
+  }
+
+  contextSourcesMap.get(context).add(sourcePath)
+
+  return [context, true, mtimesToCommit]
+}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   INDX( 	 Üa            (   ¸  è       r Ù      Ù         :W     p Z     7W     ´xMjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙH      F               a u t o p r e f i x e r . c m 9W     x b     7W     ´xMjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙP      N               a u t o p r e f i x e r . c m d       8W     x b     7W     ´xMjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙ       I               a u t o p r e f i x e r . p s 1       FW     p Z     7W     NjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙ8      2               b r o w s e  s l i s t . c m EW     x b     7W     NjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙH      D               b r o w s e r s l i s t . c m d      DW     x b     7W     NjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙ       !               b r o w s e r s l i s t . p s 1      =W     ` N     7W     Ê¨MjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙ0      .               c s s e s c . <W     h V     7W     ¤ŸMjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙH      B              
+ c s s e s c . c m d   ;W     h V     7W     ´xMjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJË                      
+ c s s e s c . p s 1   @W     ` P     7W     ÛMjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙ8      2               e s b u i l d ?W     h X     7W     ÛMjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙH      D               e s b u i l d . c m d >W     h X     7W     Ê¨MjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙ       !               e s b u i l d . p s 1 CW     ` J     7W     NjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙ0      ,               j i t i . c m BW     h R     7W     NjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙH     A               j i t i . c m d       AW     h R     7W     NjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙ                      j i t i . p s 1       IW     ` N     7W     )NjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙ8      6               n a n o i d . HW     h V     7W     )NjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙH      F              
+ n a n o i d . c m d   GW     h V     7W     )NjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙ       )              
+ n a n o i d . p s 1                 7W     üONjJËÙÍëNjJËÙÍëNjJËÙÍëNjJËÙ8     2               r e s o l v e NW     h X     7W     üONjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙH      D               r e s o l v e . c m d MW     h X     7W     üONjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙ       !               r e s o l v e . p s 1 [W     ` N     7W     ßPjJËÙßPjJËÙßPjJËÙßPjJËÙ                         r o l l u p . ZW     h V     7W     ßPjJËÙßPjJËÙßPjJËÙßPjJËÙ                        
+ r o l l u p . c m d  YW     h V     7W     ßPjJËÙßPjJËÙßPjJËÙßPjJËÙ                       
+ r o l l u p . p s 1  LW     ` P     7W     üONjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙ8      2               s u c r a s e \W     x b     7W     kQjJËÙkQjJËÙkQjJËÙkQjJËÙ                         s u c r a s e - n o d e . p s 1 X     KW     h X     7W     )NjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙH      D               s u c r a s e . c m d JW     h X     7W     )NjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙ       !               s u c r a s e . p s 1 UW     h R     7W     ãNjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJË 8      8               t a i l w i n d . c m TW     p Z     7W     ãNjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙH      G               t a i l w i n d . c m d      SW     p Z     7W     ãNjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙ       -               t a i l w i n d . p s 1      RW     h X     7W     ãNjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙ8      8               t a i l w i n d c s s QW     p `     7W     îvNjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙH      G               t a i l w i n d c s s . c m d PW     p `     7W     îvNjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙ       -               t a i l w i n d c s s . p s 1 XW     ` J     7W     ×ÄNjJËÙÍëNjJËÙÍëNjJËÙÍëNjJËÙ0      ,               v i t e . c m WW     h R     7W     ãNjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙH      A               v i t e . c m d       VW     h R     7W     ãNjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙ                      v i t e . p s 1                                                                                                                            INDX( 	  âa           (   
+  è       Ù  i Ù              NW     h X     7W     üONjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙH      D               r e s o l v e . c m d MW     h X     7W     üONjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙ       !               r e s o l v e . p s 1 [W     ` N     7W     ßPjJËÙÉ"RjJËÙÉ"RjJËÙÉ"RjJËÙ8      8               r o l l u p . ZW     h V     7W     ßPjJËÙÉ"RjJËÙÉ"RjJËÙÉ"RjJËÙH      G              
+ r o l l u p . c m d  YW     h V     7W     ßPjJËÙÉ"RjJË É"RjJËÙÉ"RjJËÙ       -              
+ r o l l u p . p s 1  LW     ` P     7W     üONjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙ8      2               s u c r a s e ^W     p Z     7W     kQjJËÙ³^RjJËÙ³^RjJËÙ³^RjJËÙ@      <               s u c r a s e - n o d e . c m ]W     x b     7W     kQjJËÙ³^RjJËÙ³^RjJËÙ³^RjJËÙP      I               s u c r a s e - n o d e . c m d X     \W     x b     7W     kQjJËÙ³^RjJËÙ³^RjJËÙ³^RjJËÙ       5               s u c r a s e - n o d e . p s 1 X    KW     h X     7W     )NjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙH      D               s u c r a s e . c m d JW     h X     7W     )NjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙ       !               s u c r a s e . p s 1 UW     h R     7W     ãNjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙ8      8               t a i l w i n d . c m TW     p Z     7W     ãNjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙH      G               t a i l w i n d . c m d      SW     p Z     7W     ãNjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙ       -               t a  l w i n d . p s 1      RW     h X     7W     ãNjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙ8      8               t a i l w i n d c s s QW     p `     7W     îvNjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙH      G               t a i l w i n d c s s . c m d PW     p `     7W     îvNjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙ       -               t a i l w i n d c s s . p s 1 aW     € n     7W     ï^TjJËÙ>ŠTjJËÙ>ŠTjJËÙ>ŠTjJËÙH      F               u p d a t e - b r o w s e r s l i s t - d b . `W     ˆ v     7W     =TjJË >ŠTjJËÙ>ŠTjJËÙ>ŠTjJËÙP      N               u p d a t e - b r o w s e r s l i s t - d b . c m d Ù_W     ˆ v     7W     MçSjJËÙï^TjJËÙï^TjJËÙï^TjJËÙ       I               u p d a t e - b r o w s e r s l i s t - d b . p s 1 ÙXW     ` J     7W     ×ÄNjJËÙÍëNjJËÙÍëNjJËÙÍëNjJËÙ0      ,               v i t e . c m WW     h R     7W     ãNjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙH      A               v i t e . c m d       VW     h R     7W     ãNjJËÙ×ÄNjJËÙ×ÄNjJËÙ×ÄNjJËÙ                     v i t e . p s 1                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  INDX( 	 )Â5_            (   à  è             Ù            Ê\     ` L     É\     pû¤ÊÙ ˜áE¤ÊÙpû¤ÊÙpû¤ÊÙ 0      Ç.               a f . j s     Ë\     ` L     É\     6pû¤ÊÙ ˜áE¤ÊÙ6pû¤ÊÙ6pû¤ÊÙ @      ´;               a r . j s     Ì\     ` L     É\     ø\pû¤ÊÙ ˜áE¤ÊÙø\pû¤ÊÙø\pû¤ÊÙ @      á2               a z . j s     Í\     ` L     É\     ø\pû¤ÊÙ ˜áE¤ÊÙãƒpû¤ÊÙãƒpû¤ÊÙ P      ¦H               b g . j s     Î\     ` L     É\     ãƒpû¤ÊÙ ˜áE¤ÊÙÏ»pû¤ÊÙ«pû¤ÊÙ @     U>               b n . j s     Ï\     ` L     É\     Ï»pû¤ÊÙ ˜áE¤ÊÙÏ»pû¤ÊÙÏ»pû¤ÊÙ 0      </               b s . j s     Ğ\     ` L     É\     éâpû¤ÊÙ ˜áE¤ÊÙéâpû¤ÊÙéâpû¤ÊÙ @      õ3               c a . j s     Ñ\     ` L     É\     @qû¤ÊÙ ˜áE¤ÊÙ+qû¤ÊÙ+qû¤ÊÙ @      Ë3               c s . j s     Ò\     ` L     É\     +qû¤ÊÙ ˜áE¤ÊÙRqû¤ÊÙRqû¤ÊÙ @      G0               c y . j s     Ó\     ` L     É\     Rqû¤ÊÙ ˜áE¤ÊÙ0kqû¤ÊÙ0kqû¤ÊÙ @      k1               d a . j s    Õ\     h R     É\     îÄqû¤ÊÙ ˜áE¤ÊÙîÄqû¤ÊÙîÄqû¤ÊÙ @      84               d e - c h . j s       Ô\     ` L     É\     Öqû¤ÊÙ ˜áE¤ÊÙÖqû¤ÊÙÖqû¤ÊÙ @      24               d e . j s     Ö\     ` L     É\     hÚqû¤ÊÙ ˜áE¤ÊÙdrû¤ÊÙdrû¤ÊÙ P      ]I               e l . j s     Ø\     h R     É\     Â1rû¤ÊÙ ÅG¤ÊÙX@rû¤ÊÙX@rû¤ÊÙ 0      ä.               e n - a u . j s       Ù\     h R     É\     X@rû¤ÊÙ ÅG¤ÊÙºfrû¤ÊÙºfrû¤ÊÙ 0      ä.               e n - c a . j s       Ú\     h R     É\     ºfrû¤ÊÙ ÅG¤ÊÙ¯rû¤ÊÙ¯rû¤ÊÙ 0      î.               e n - g b . j s       ×\     ` L     É\     Ô
+rû¤ÊÙ ˜áE¤ÊÙÔ
+rû¤ÊÙÔ
+rû¤ÊÙ 0      ö.               e n . j s     Û\     ` L     É\     ßyû¤ÊÙ ÅG¤ÊÙRûyû¤ÊÙRûyû¤ÊÙ @      —1               e o . j s     İ\     h R     É\     2Izû¤ÊÙ ÅG¤ÊÙ*pzû¤ÊÙ*pzû¤ÊÙ @      4               e s - m x . j s       Ü\     ` L     É\     A"zû¤ÊÙ ÅG¤ÊÙ2Izû¤ÊÙ2Izû¤ÊÙ @      M4               e s . j s                   É\     *pzû¤ÊÙ ÅG¤ÊÙ—zû¤ÊÙ—zû¤ÊÙ @      ~0               e t . j s     ß\     ` L     É\     —zû¤ÊÙ ÅG¤ÊÙ¾zû¤ÊÙ¾zû¤ÊÙ @      ;3               e u . j s     à\     ` L     É\     ¾zû¤ÊÙ ÅG¤ÊÙMÚzû¤ÊÙMÚzû¤ÊÙ P      Ş@               f a . j s     á\     ` L     É\     MÚzû¤ÊÙ ÅG¤ÊÙƒ{û¤ÊÙƒ{û¤ÊÙ @      Î1               f i . j s     â\     ` L     É\     ƒ{û¤ÊÙ ÅG¤ÊÙ…){û¤ÊÙ…){û¤ÊÙ @      1               f o . j s     ä\     h R     É\     xP{û¤ÊÙ ÅG¤ÊÙxP{û¤ÊÙxP{û¤Ê  @      d3               f r - c a . j s       ã\     ` L     É\     …){û¤ÊÙ ÅG¤ÊÙxP{û¤ÊÙxP{û¤ÊÙ @      x6               f r . j s     å\     ` L     É\     _w{û¤ÊÙ ÅG¤ÊÙ_w{û¤ÊÙ_w{û¤ÊÙ @      Q4               g l . j s     æ\     ` L     É\     W{û¤ÊÙ ÅG¤ÊÙW{û¤ÊÙW{û¤ÊÙ P      êM               g u . j s     ç\     ` L     É\     Š¸{û¤ÊÙ ÅG¤ÊÙŠ¸{û¤ÊÙŠ¸{û¤ÊÙ @      »9               h e . j s     è\     ` L     É\     ß{û¤ÊÙ ÅG¤ÊÙß{û¤ÊÙß{û¤ÊÙ @      ·>              h i . j s     é\     ` L     É\     |û¤ÊÙ ÅG¤ÊÙ|û¤ÊÙ|û¤ÊÙ @      ?0               h r . j s     ê\     ` L     É\     û,|û¤ÊÙ ÅG¤ÊÙÈ@|û¤ÊÙû,|û¤ÊÙ @      ş4               h u . j s     ë\     ` L     É\     Šh|û¤ÊÙ ÅG¤ÊÙŠh|û¤ÊÙŠh|û¤ÊÙ @      10               i d . j s     ì\     ` L     É\     ||û¤ÊÙ ÅG¤ÊÙ||û¤ÊÙ||û¤ÊÙ @      ¥0               i s . j s     í\     ` L     É\     y¶|û¤ÊÙ ÅG¤ÊÙy¶|û¤ÊÙy¶|û¤ÊÙ @      ¶4               i t . j s     î\     ` L    É\     y¶|û¤ÊÙ ÅG¤ÊÙhİ|û¤ÊÙhİ|û¤ÊÙ @      Š9               j a . j s     ï\     ` L     É\     hİ|û¤ÊÙ ÅG¤ÊÙhİ|û¤ÊÙhİ|û¤ÊÙ `      üQ               k a . j s     ğ\     ` L     É\     ÅÍ‚û¤ÊÙ ÅG¤ÊÙ´ô‚û¤ÊÙ´ô‚û¤ÊÙ `      ÈZ               k m . j s     ñ\     ` L     É\     ´ô‚û¤ÊÙ ÅG¤ÊÙ¬ƒû¤ÊÙ´ô‚û¤ÊÙ @      Ã2               k o . j s     ò\     ` L     É\     ¬ƒû¤ÊÙ ÅG¤ÊÙŸdƒû¤ÊÙŸdƒû¤ÊÙ P      F               k u . j s                                                  INDX( 	 Äâ5_           (   À  è         .  Ù.   Ù        ß\     ` L     É\     —zû¤ÊÙ ÅG¤ÊÙ¾zû¤ÊÙ¾zû¤ÊÙ @      ;3               e u . j s     à\     ` L     É\     ¾zû¤ÊÙ ÅG¤ÊÙMÚzû¤ÊÙMÚzû¤ÊÙ P      Ş@               f a . j s     á\     ` L     É\     MÚzû¤ÊÙ ÅG¤ÊÙƒ{û¤ÊÙƒ{û¤ÊÙ @      Î1               f i . j s     â\     ` L     É\     ƒ{û¤ÊÙ ÅG¤ÊÙ…){û¤ÊÙ…){û¤ÊÙ @      1               f o . j s     ä\     h R     É\     xP{û¤ÊÙ ÅG¤ÊÙxP{û¤ÊÙxP{û¤ÊÙ @     d3               f r - c a . j s       ã\     ` L     É\     …){û¤ÊÙ ÅG¤ÊÙxP{û¤ÊÙxP{û¤ÊÙ @      x6               f r . j s     å\     ` L     É\     _w{û¤ÊÙ ÅG¤ÊÙ_w{û¤ÊÙ_w{û¤ÊÙ @      Q4               g l . j s     æ\     ` L     É\     W{û¤ÊÙ ÅG¤ÊÙW{û¤ÊÙW{û¤ÊÙ P      êM               g u . j s     ç\     ` L     É\     Š¸{û¤ÊÙ ÅG¤ÊÙŠ¸{û¤ÊÙŠ¸{û¤ÊÙ @      »9               h e . j s     è\     ` L     É\     ß{û¤ÊÙ ÅG¤ÊÙß{û¤ÊÙß{û¤ÊÙ @      ·>               h i  j s     é\     ` L     É\     |û¤ÊÙ ÅG¤ÊÙ|û¤ÊÙ|û¤ÊÙ @      ?0               h r . j s     ê\     ` L     É\     û,|û¤ÊÙ ÅG¤ÊÙÈ@|û¤ÊÙû,|û¤ÊÙ @      ş4               h u . j s     ë\     ` L     É\     Šh|û¤ÊÙ ÅG¤ÊÙŠh|û¤ÊÙŠh|û¤ÊÙ @      10               i d . j s     ì\     ` L     É\     ||û¤ÊÙ ÅG¤ÊÙ||û¤ÊÙ||û¤ÊÙ @      ¥0               i s . j s     í\     ` L     É\     y¶|û¤ÊÙ ÅG¤ÊÙy¶|û¤ÊÙy¶|û¤ÊÙ @      ¶4               i t . j s     î\     ` L     É\     y¶|û¤ÊÙ ÅG¤ÊÙhİ|û¤ÊÙhİ|û¤ÊÙ @      Š9               j a . j s     ï\     ` L     É\     hİ|û¤ÊÙ ÅG¤ÊÙhİ|û¤ÊÙhİ|û¤ÊÙ `      üQ               k a . j s     ğ\     ` L     É\     ÅÍ‚û¤ÊÙ ÅG¤ÊÙ´ô‚û¤ÊÙ´ô‚û¤ÊÙ `      ÈZ               k m . j s     ñ\     ` L     É\     ´ô‚û¤ÊÙ ÅG¤ÊÙ¬ƒû¤ÊÙ´ô‚û¤ÊÙ @      Ã2               k o . j s     ò\     ` L     É\     ¬ƒû¤ÊÙ ÅG¤ÊÙŸdƒû¤ÊÙŸdƒû¤ÊÙ P      F               k u . j s                   É\     À‹ƒû¤ÊÙ ÅG¤ÊÙ@¬ƒû¤ÊÙ@¬ƒû¤Ê  @      u3               l t . j s     ô\     ` L     É\     €ùƒû¤ÊÙ ÅG¤ÊÙ€ùƒû¤ÊÙ€ùƒû¤ÊÙ @      d4               l v . j s     õ\     ` L     É\     Í „û¤ÊÙ ÅG¤ÊÙÍ „û¤ÊÙÍ „û¤ÊÙ @      “4               m k . j s     ö\     ` L     É\     rG„û¤ÊÙ ÅG¤ÊÙrG„û¤ÊÙrG„û¤ÊÙ @      E<               m n . j s     ÷\     ` L     É\     dZ„û¤ÊÙ ÅG¤ÊÙdZ„û¤ÊÙdZ„û¤ÊÙ 0      œ/               m s . j s     ø\     ` L     É\     ƒ^…û¤ÊÙ ÅG¤ÊÙ2s…û¤ÊÙxr…û¤ÊÙ 0      ê/               n b  j s     ù\     ` L     É\     2s…û¤ÊÙ ÅG¤ÊÙ2s…û¤ÊÙ2s…û¤ÊÙ @      ‘1               n l . j s     ú\     ` L     É\     "¨…û¤ÊÙ ÅG¤ÊÙ"¨…û¤ÊÙ"¨…û¤ÊÙ @      	0               n o . j s     û\     ` L     É\     "¨…û¤ÊÙ ÅG¤ÊÙœØ…û¤ÊÙœØ…û¤ÊÙ @      5               o c . j s     ü\     ` L     É\     ™ÿ…û¤ÊÙ ÅG¤ÊÙY†û¤ÊÙY†û¤ÊÙ @      }4               p l . j s     ş\     h R     É\     îM†û¤ÊÙ ÅG¤ÊÙîM†û¤ÊÙîM†û¤ÊÙ @      v4               p t - b r . j s       ı\     ` L    É\     Y†û¤ÊÙ ÅG¤ÊÙ	9†û¤ÊÙ	9†û¤ÊÙ @      4               p t . j s     ÿ\     ` L     É\     ü¾†û¤ÊÙ ÅG¤ÊÙü¾†û¤ÊÙü¾†û¤ÊÙ @      ¸6               r o . j s      ]     ` L     É\     Äú†û¤ÊÙ ÅG¤ÊÙÄú†û¤ÊÙÄú†û¤ÊÙ P       J               r u . j s     ]     ` L     É\     ‹.Œû¤ÊÙ ÅG¤ÊÙ°KŒû¤ÊÙ°KŒû¤ÊÙ P      òB               s i . j s     ]     ` L     É\     ŸrŒû¤ÊÙ ÅG¤ÊÙˆŒû¤ÊÙˆŒû¤ÊÙ @      ;4               s k . j s     ]     ` L     É\     ¯Œû¤ÊÙ ÅG¤ÊÙ ÉŒû¤Ê  ÉŒû¤ÊÙ @      ö0               s l . j s     ]     ` L     É\     ˜İŒû¤ÊÙ ÅG¤ÊÙ˜İŒû¤ÊÙ˜İŒû¤ÊÙ @      =5               s q . j s     ]     h V     É\     4û¤ÊÙ ÅG¤ÊÙuCû¤ÊÙ²;û¤ÊÙ @      O1              
+ s r - l a t n . j s   ]     ` L     É\     û¤ÊÙ ÅG¤ÊÙ4û¤ÊÙ4û¤ÊÙ P      üD               s r . j s     ]     ` L     É\     uCû¤ÊÙ ÅG¤ÊÙuCû¤ÊÙuCû¤ÊÙ @      n0               s v . j s                                                                          INDX( 	 èí5_           (   Ğ
+  è         j  Ù              ô\     ` L     É\     €ùƒû¤ÊÙ ÅG¤ÊÙ€ùƒû¤ÊÙ€ùƒû¤ÊÙ @      d4               l v . j s     õ\     ` L     É\     Í „û¤ÊÙ ÅG¤ÊÙÍ „û¤ÊÙÍ „û¤ÊÙ @      “4               m k . j s     ö\     ` L     É\     rG„û¤ÊÙ ÅG¤ÊÙrG„û¤ÊÙrG„û¤ÊÙ @      E<               m n . j s     ÷\     ` L     É\     dZ„û¤ÊÙ ÅG¤ÊÙdZ„û¤ÊÙdZ„û¤ÊÙ 0      œ/               m s . j s     ø\     ` L     É\     ƒ^…û¤ÊÙ ÅG¤ÊÙ2s…û¤ÊÙxr…û¤ÊÙ 0     ê/               n b . j s     ù\     ` L     É\     2s…û¤ÊÙ ÅG¤ÊÙ2s…û¤ÊÙ2s…û¤ÊÙ @      ‘1               n l . j s     ú\     ` L     É\     "¨…û¤ÊÙ ÅG¤ÊÙ"¨…û¤ÊÙ"¨…û¤ÊÙ @      	0               n o . j s     û\     ` L     É\     "¨…û¤ÊÙ ÅG¤ÊÙœØ…û¤ÊÙœØ…û¤ÊÙ @      5               o c . j s     ü\     ` L     É\     ™ÿ…û¤ÊÙ ÅG¤ÊÙY†û¤ÊÙY†û¤ÊÙ @      }4               p l . j s     ş\     h R     É\     îM†û¤ÊÙ ÅG¤ÊÙîM†û¤ÊÙîM†û¤ÊÙ @      v4               p t - b r .  s       ı\     ` L     É\     Y†û¤ÊÙ ÅG¤ÊÙ	9†û¤ÊÙ	9†û¤ÊÙ @      4               p t . j s     ÿ\     ` L     É\     ü¾†û¤ÊÙ ÅG¤ÊÙü¾†û¤ÊÙü¾†û¤ÊÙ @      ¸6               r o . j s      ]     ` L     É\     Äú†û¤ÊÙ ÅG¤ÊÙÄú†û¤ÊÙÄú†û¤ÊÙ P       J               r u . j s     ]     ` L     É\     ‹.Œû¤ÊÙ ÅG¤ÊÙ°KŒû¤ÊÙ°KŒû¤ÊÙ P      òB               s i . j s     ]     ` L     É\     ŸrŒû¤ÊÙ ÅG¤ÊÙˆŒû¤ÊÙˆŒû¤ÊÙ @      ;4               s k . j s     ]     ` L     É\     ¯Œû¤ÊÙ ÅG¤ÊÙ ÉŒû¤ÊÙ ÉŒû¤ÊÙ @      ö0               s l . j s     ]     ` L     É\     ˜İŒû¤ÊÙ ÅG¤ÊÙ˜İŒû¤ÊÙ˜İŒû¤ÊÙ @      =5               s q . j s     ]     h V     É\     4û¤ÊÙ ÅG¤ÊÙuCû¤ÊÙ²;û¤ÊÙ @      O1              
+ s r - l a t n . j s   ]     ` L     É\     û¤ÊÙ ÅG¤ÊÙ4û¤ÊÙ4û¤ÊÙ P      üD               s r . j s     ]     ` L     É\     uCû¤ÊÙ ÅG¤ÊÙuCû¤ÊÙuCû¤ÊÙ @      n0               s v . j s     ]     ` L     É\     cjû¤ÊÙ ÅG¤ÊÙZ‘û¤Ê Z‘û¤ÊÙ P      MJ               t h . j s     	]     ` L     É\     ]œû¤ÊÙ ÅG¤ÊÙOÃû¤ÊÙ]œû¤ÊÙ @      ã3               t r . j s     
+]     ` L     É\     OÃû¤ÊÙ ÅG¤ÊÙRêû¤ÊÙRêû¤ÊÙ @      ÿ<               t t . j s     ]     ` L     É\     Rêû¤ÊÙ ÅG¤ÊÙ‰û¤ÊÙ‰û¤ÊÙ P      ãE               u g . j s     ]     ` L     É\     +“û¤ÊÙ ÅG¤ÊÙ„“û¤ÊÙ„“û¤ÊÙ P      ˜J               u k . j s     ]     ` L     É\     şª“û¤ÊÙ ÅG¤ÊÙİÃ“û¤ÊÙİÃ“û¤ÊÙ @      m8              v i . j s     ]     h R     É\     œ#”û¤ÊÙ ÅG¤ÊÙí8”û¤ÊÙí8”û¤ÊÙ 0      Í-               z h - c n . j s       ]     ` L     É\     Éê“û¤ÊÙ ÅG¤ÊÙ®ü“û¤ÊÙ®ü“û¤ÊÙ 0      “-               z h . j s                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        INDX( 	 16_            (   Ø  è         .  ÙÙ.          ]     ` L     ]     %Ê”û¤ÊÙ ÅG¤ÊÙ%Ê”û¤ÊÙ%Ê”û¤ÊÙ       Á               a f . j s s l ]     ` L     ]     «ù”û¤ÊÙ ÅG¤ÊÙ«ù”û¤ÊÙ«ù”û¤ÊÙ        .               a r . j s s l ]     ` L     ]     • •û¤ÊÙ ÅG¤ÊÙ• •û¤ÊÙ• •û¤ÊÙ        î               a z . j s s l ]     ` L     ]     Ì1•û¤ÊÙ ÅG¤ÊÙÌ1•û¤ÊÙÌ1•û¤ÊÙ                       b g . j s s l ]     ` L     ]     aY•û¤ÊÙ ÅG¤ÊÙV€•û¤ÊÙV€•û¤ÊÙ       ¶               c a . j s s l ]     ` L     ]     V€•û¤ÊÙ ÅG¤ÊÙK§•û¤ÊÙK§•û¤ÊÙ        ö               c s . j s s l ]     ` L     ]     K§•û¤ÊÙ ÅG¤ÊÙ>Î•û¤ÊÙ>Î•û¤ÊÙ        ª               c y . j s s l ]     ` L     ]     >Î•û¤ÊÙ ÅG¤ÊÙ>Î•û¤ÊÙ>Î•û¤ÊÙ        ™               d a . j s s l  ]     h R     ]     ü›û¤ÊÙ ÅG¤ÊÙü›û¤ÊÙü›û¤ÊÙ        j               d e - c h . j s      ]     ` L     ]     B÷•û¤ÊÙ ÅG¤ÊÙB÷•û¤ÊÙB÷•û¤ÊÙ        2               d e  j s s l !]     ` L     ]     Q›û¤ÊÙ ÅG¤ÊÙx›û¤ÊÙx›û¤ÊÙ        Ñ               e l . j s s l #]     h R     ]     ±‘›û¤ÊÙ ÅG¤ÊÙ±‘›û¤ÊÙ±‘›û¤ÊÙ       š               e n - a u . j s      $]     h R     ]      ¸›û¤ÊÙ ÅG¤ÊÙ·É›û¤ÊÙ·É›û¤ÊÙ       š               e n - g b . j s      "]     ` L     ]     x›û¤ÊÙ ÅG¤ÊÙ±‘›û¤ÊÙ±‘›û¤ÊÙ       —               e n . j s s l %]     ` L     ]     ·É›û¤ÊÙ ÅG¤ÊÙ·É›û¤ÊÙ·É›û¤ÊÙ        ¿               e o . j s s l ']     h R     ]     &#œû¤ÊÙ ÅG¤ÊÙ&#œû¤ÊÙ&#œû¤ÊÙ                       e s - m x . j s      &]     ` L     ]     ü›û¤ÊÙ ÅG¤ÊÙü›û¤ÊÙü›û¤ÊÙ        Á               e s . j s s l (]     ` L     ]     &#œû¤ÊÙ ÅG¤ÊÙ&#œû¤ÊÙ&#œû¤ÊÙ        D               e t . j s s l )]     ` L     ]     LXœû¤ÊÙ ÅG¤ÊÙ½`œû¤ÊÙ½`œû¤ÊÙ        ›               e u . j s s l *]     ` L     ]     ½`œû¤ÊÙ ÅG¤ÊÙ½`œû¤ÊÙ½`œû¤ÊÙ        ³               f a . j s s l               ]     `å¡û¤Ê  ÅG¤ÊÙK¢û¤ÊÙK¢û¤ÊÙ                       f i . j s s l ,]     ` L     ]     53¢û¤ÊÙ ÅG¤ÊÙß:¢û¤ÊÙß:¢û¤ÊÙ       ™               f o . j s s l .]     h R     ]     ÷‚¢û¤ÊÙ ÅG¤ÊÙ÷‚¢û¤ÊÙ÷‚¢û¤ÊÙ        ¾               f r - c a . j s      -]     ` L     ]     :a¢û¤ÊÙ ÅG¤ÊÙ°n¢û¤ÊÙ°n¢û¤ÊÙ        ¿               f r . j s s l /]     ` L     ]     p©¢û¤ÊÙ ÅG¤ÊÙp©¢û¤ÊÙp©¢û¤ÊÙ        á               g l . j s s l 0]     ` L     ]     øß¢û¤ÊÙ ÅG¤ÊÙøß¢û¤ÊÙøß¢û¤Ê         i               g u . j s s l 1]     ` L     ]     øß¢û¤ÊÙ ÅG¤ÊÙøß¢û¤ÊÙøß¢û¤ÊÙ        à               h e . j s s l 2]     ` L     ]     '2£û¤ÊÙ ÅG¤ÊÙ'2£û¤ÊÙ'2£û¤ÊÙ       ¥               h i . j s s l 3]     ` L     ]     Y£û¤ÊÙ ÅG¤ÊÙ„^£û¤ÊÙ„^£û¤ÊÙ        »               h r . j s s l 4]     ` L     ]     Ÿ¥û¤ÊÙ ÅG¤ÊÙ>¥û¤ÊÙ>¥û¤ÊÙ                        h u . j s s l 5]     ` L     ]     'Q¥û¤ÊÙ ÅG¤ÊÙ'Q¥û¤ÊÙ'Q¥û¤ÊÙ       É               i d  j s s l 6]     ` L     ]     'Q¥û¤ÊÙ ÅG¤ÊÙx¥û¤ÊÙx¥û¤ÊÙ        O               i t . j s s l 7]     ` L     ]     ÇŒ¥û¤ÊÙ ÅG¤ÊÙZ’¥û¤ÊÙZ’¥û¤ÊÙ        Õ               j a . j s s l 8]     ` L     ]     ŠB¦û¤ÊÙ ÅG¤ÊÙŠB¦û¤ÊÙŠB¦û¤ÊÙ        ‘               k m . j s s l 9]     ` L     ]     ÿ!®û¤ÊÙ ÅG¤ÊÙÿ!®û¤ÊÙÿ!®û¤ÊÙ        á               k o . j s s l :]     ` L     ]     ÿ!®û¤ÊÙ ÅG¤ÊÙ–q®û¤ÊÙ–q®û¤ÊÙ        “               k u . j s s l ;]     ` L     ]     l®û¤ÊÙ ÅG¤ÊÙ‰¤®û¤ÊÙ‰¤®û¤ÊÙ                       l t . j s s l <]     ` L     ]     Ø¹®û¤ÊÙ ÅG¤ÊÙJÎ®û¤ÊÙØ¹®û¤ÊÙ        d               l v . j s s l =]     ` L     ]     >õ®û¤ÊÙ ÅG¤ÊÙ>õ®û¤ÊÙ>õ®û¤ÊÙ                       m k . j s s l >]     ` L     ]     5¯û¤ÊÙ ÅG¤ÊÙà<¯û¤ÊÙà<¯û¤ÊÙ                      m n . j s s l ]     € n     ]     %Ê”û¤ÊÙ ÅG¤ÊÙ%Ê”û¤ÊÙ%Ê”û¤ÊÙ       y               _ t r a n s l a t i o n s t a t u s . t x t                        INDX( 	 CQ6_           (   À  è       Ù.  Ù    Ù        ,]     ` L     ]     53¢û¤ÊÙ ÅG¤ÊÙß:¢û¤ÊÙß:¢û¤ÊÙ       ™               f o . j s s l .]     h R     ]     ÷‚¢û¤ÊÙ ÅG¤ÊÙ÷‚¢û¤ÊÙ÷‚¢û¤ÊÙ        ¾               f r - c a . j s      -]     ` L     ]     :a¢û¤ÊÙ ÅG¤ÊÙ°n¢û¤ÊÙ°n¢û¤ÊÙ        ¿               f r . j s s l /]     ` L     ]     p©¢û¤ÊÙ ÅG¤ÊÙp©¢û¤ÊÙp©¢û¤ÊÙ        á               g l . j s s l 0]     ` L     ]     øß¢û¤ÊÙ ÅG¤ÊÙøß¢û¤ÊÙøß¢û¤Ê         i               g u . j s s l 1]     ` L     ]     øß¢û¤ÊÙ ÅG¤ÊÙøß¢û¤ÊÙøß¢û¤ÊÙ        à               h e . j s s l 2]     ` L     ]     '2£û¤ÊÙ ÅG¤ÊÙ'2£û¤ÊÙ'2£û¤ÊÙ       ¥               h i . j s s l 3]     ` L     ]     Y£û¤ÊÙ ÅG¤ÊÙ„^£û¤ÊÙ„^£û¤ÊÙ        »               h r . j s s l 4]     ` L     ]     Ÿ¥û¤ÊÙ ÅG¤ÊÙ>¥û¤ÊÙ>¥û¤ÊÙ                        h u . j s s l 5]     ` L     ]     'Q¥û¤ÊÙ ÅG¤ÊÙ'Q¥û¤ÊÙ'Q¥û¤ÊÙ       É               i d  j s s l 6]     ` L     ]     'Q¥û¤ÊÙ ÅG¤ÊÙx¥û¤ÊÙx¥û¤ÊÙ        O               i t . j s s l 7]     ` L     ]     ÇŒ¥û¤ÊÙ ÅG¤ÊÙZ’¥û¤ÊÙZ’¥û¤ÊÙ        Õ               j a . j s s l 8]     ` L     ]     ŠB¦û¤ÊÙ ÅG¤ÊÙŠB¦û¤ÊÙŠB¦û¤ÊÙ        ‘               k m . j s s l 9]     ` L     ]     ÿ!®û¤ÊÙ ÅG¤ÊÙÿ!®û¤ÊÙÿ!®û¤ÊÙ        á               k o . j s s l :]     ` L     ]     ÿ!®û¤ÊÙ ÅG¤ÊÙ–q®û¤ÊÙ–q®û¤ÊÙ        “               k u . j s s l ;]     ` L     ]     l®û¤ÊÙ ÅG¤ÊÙ‰¤®û¤ÊÙ‰¤®û¤ÊÙ                       l t . j s s l <]     ` L     ]     Ø¹®û¤ÊÙ ÅG¤ÊÙJÎ®û¤ÊÙØ¹®û¤ÊÙ        d               l v . j s s l =]     ` L     ]     >õ®û¤ÊÙ ÅG¤ÊÙ>õ®û¤ÊÙ>õ®û¤ÊÙ                       m k . j s s l >]     ` L     ]     5¯û¤ÊÙ ÅG¤ÊÙà<¯û¤ÊÙà<¯û¤ÊÙ                      m n . j s s l ?]     ` L     ]     à<¯û¤ÊÙ ÅG¤ÊÙÅc¯û¤ÊÙÅc¯û¤ÊÙ        k               n b . j s s l               ]     ÁŠ¯û¤ÊÙ ÅG¤ÊÙÁŠ¯û¤ÊÙÁŠ¯û¤Ê         ¶               n l . j s s l A]     ` L     ]     ÁŠ¯û¤ÊÙ ÅG¤ÊÙ´¯û¤ÊÙ´¯û¤ÊÙ        ß               n o . j s s l B]     ` L     ]     ´¯û¤ÊÙ ÅG¤ÊÙ´¯û¤ÊÙ´¯û¤ÊÙ        ì               o c . j s s l C]     ` L     ]     Û¯û¤ÊÙ ÅG¤ÊÙû¯û¤ÊÙû¯û¤ÊÙ        *               p l . j s s l E]     h R     ]     äø´û¤ÊÙ ÅG¤ÊÙó.µû¤ÊÙó.µû¤ÊÙ        X               p t - b r . j s      D]     ` L     ]     û¯û¤ÊÙ ÅG¤ÊÙ°û¤ÊÙ°û¤ÊÙ        Ú              p t . j s s l F]     ` L     ]     ó.µû¤ÊÙ ÅG¤ÊÙJjµû¤ÊÙJjµû¤ÊÙ        Ñ               r o . j s s l G]     ` L     ]     ,‘µû¤ÊÙ ÅG¤ÊÙ,‘µû¤ÊÙ,‘µû¤ÊÙ        ø               r u . j s s l H]     ` L     ]     ,‘µû¤ÊÙ ÅG¤ÊÙ,‘µû¤ÊÙ,‘µû¤ÊÙ        †               s i . j s s l I]     ` L     ]     ,‘µû¤ÊÙ ÅG¤ÊÙ,‘µû¤ÊÙ,‘µû¤ÊÙ        j               s k . j s s l J]     ` L     ]     ,‘µû¤ÊÙ ÅG¤ÊÙ,‘µû¤ÊÙ,‘µû¤ÊÙ        H               s l . j s s l K]     ` L    ]     ¶û¤ÊÙ ÅG¤ÊÙ¶¶û¤ÊÙ¶¶û¤ÊÙ        G               s q . j s s l M]     h V     ]     bå¶û¤ÊÙ ÅG¤ÊÙbå¶û¤ÊÙbå¶û¤ÊÙ        s              
+ s r - l a t n . j s  L]     ` L     ]     ¶¶û¤ÊÙ ÅG¤ÊÙ=¶û¤ÊÙ=¶û¤ÊÙ        I               s r . j s s l N]     ` L     ]     $¬·û¤ÊÙ ÅG¤ÊÙ6Ó·û¤ÊÙ6Ó·û¤ÊÙ                       s v . j s s l O]     ` L     ]     ¶¸û¤ÊÙ ÅG¤ÊÙ¶¸û¤ÊÙ¶¸û¤ÊÙ                       t h . j s s l P]     ` L     ]     aR¸û¤ÊÙ ÅG¤Ê š¸û¤ÊÙš¸û¤ÊÙ        å               t r . j s s l Q]     ` L     ]     šgºû¤ÊÙ ÅG¤ÊÙšgºû¤ÊÙšgºû¤ÊÙ        Õ               t t . j s s l R]     ` L     ]     €ºû¤ÊÙ ÅG¤ÊÙS˜ºû¤ÊÙS˜ºû¤ÊÙ                       u g . j s s l S]     ` L     ]     S˜ºû¤ÊÙ ÅG¤ÊÙtµºû¤ÊÙtµºû¤ÊÙ                       u k . j s s l ]     € n     ]     %Ê”û¤ÊÙ ÅG¤ÊÙ%Ê”û¤ÊÙ%Ê”û¤ÊÙ       y               _ t r a n s l a t i o n s t a t u s . t x t                                        INDX( 	 VU6_           (   	  è       Ù.   Ù              A]     ` L     ]     ÁŠ¯û¤ÊÙ ÅG¤ÊÙ´¯û¤ÊÙ´¯û¤ÊÙ        ß               n o . j s s l B]     ` L     ]     ´¯û¤ÊÙ ÅG¤ÊÙ´¯û¤ÊÙ´¯û¤ÊÙ        ì               o c . j s s l C]     ` L     ]     Û¯û¤ÊÙ ÅG¤ÊÙû¯û¤ÊÙû¯û¤ÊÙ        *               p l . j s s l E]     h R     ]     äø´û¤ÊÙ ÅG¤ÊÙó.µû¤ÊÙó.µû¤ÊÙ        X               p t - b r . j s      D]     ` L     ]     û¯û¤ÊÙ ÅG¤ÊÙ°û¤ÊÙ°û¤Ê         Ú               p t . j s s l F]     ` L     ]     ó.µû¤ÊÙ ÅG¤ÊÙJjµû¤ÊÙJjµû¤ÊÙ        Ñ               r o . j s s l G]     ` L     ]     ,‘µû¤ÊÙ ÅG¤ÊÙ,‘µû¤ÊÙ,‘µû¤ÊÙ        ø               r u . j s s l H]     ` L     ]     ,‘µû¤ÊÙ ÅG¤ÊÙ,‘µû¤ÊÙ,‘µû¤ÊÙ        †               s i . j s s l I]     ` L     ]     ,‘µû¤ÊÙ ÅG¤ÊÙ,‘µû¤ÊÙ,‘µû¤ÊÙ        j               s k . j s s l J]     ` L     ]     ,‘µû¤ÊÙ ÅG¤ÊÙ,‘µû¤ÊÙ,‘µû¤ÊÙ        H               s l  j s s l K]     ` L     ]     ¶û¤ÊÙ ÅG¤ÊÙ¶¶û¤ÊÙ¶¶û¤ÊÙ        G               s q . j s s l M]     h V     ]     bå¶û¤ÊÙ ÅG¤ÊÙbå¶û¤ÊÙbå¶û¤ÊÙ        s              
+ s r - l a t n . j s  L]     ` L     ]     ¶¶û¤ÊÙ ÅG¤ÊÙ=¶û¤ÊÙ=¶û¤ÊÙ        I               s r . j s s l N]     ` L     ]     $¬·û¤ÊÙ ÅG¤ÊÙ6Ó·û¤ÊÙ6Ó·û¤ÊÙ                       s v . j s s l O]     ` L     ]     ¶¸û¤ÊÙ ÅG¤ÊÙ¶¸û¤ÊÙ¶¸û¤ÊÙ                       t h . j s s l P]     ` L    ]     aR¸û¤ÊÙ ÅG¤ÊÙš¸û¤ÊÙš¸û¤ÊÙ        å               t r . j s s l Q]     ` L     ]     šgºû¤ÊÙ ÅG¤ÊÙšgºû¤ÊÙšgºû¤ÊÙ        Õ               t t . j s s l R]     ` L     ]     €ºû¤ÊÙ ÅG¤ÊÙS˜ºû¤ÊÙS˜ºû¤ÊÙ                       u g . j s s l S]     ` L     ]     S˜ºû¤ÊÙ ÅG¤ÊÙtµºû¤ÊÙtµºû¤ÊÙ                       u k . j s s l T]     ` L     ]     ×¿û¤ÊÙ ÅG¤ÊÙšCÀû¤ÊÙšCÀû¤ÊÙ                       v i . j s s l V]     h R     ]     ûxÀû¤ÊÙ ÅG¤ÊÙíŸÀû¤Ê íŸÀû¤ÊÙ        6               z h - c n . j s      U]     ` L     ]     RÀû¤ÊÙ ÅG¤ÊÙûxÀû¤ÊÙûxÀû¤ÊÙ        Z               z h . j s s l ]     € n     ]     %Ê”û¤ÊÙ ÅG¤ÊÙ%Ê”û¤ÊÙ%Ê”û¤ÊÙ       y               _ t r a n s l a t i o n s t a t u s . t x t                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     INDX( 	 R7_            (   Ğ  è            Ù    Ù        ^     ` L     ^     Ï½şû¤ÊÙ òCH¤ÊÙÏ½şû¤ÊÙÏ½şû¤ÊÙØ      Ø               a f . j s     ^     ` L     ^     Ï½şû¤ÊÙ òCH¤ÊÙÏ½şû¤ÊÙÏ½şû¤ÊÙ       Y               a r . j s     ^     ` L     ^     Tÿû¤ÊÙ òCH¤ÊÙTÿû¤ÊÙTÿû¤ÊÙ       Â               b g . j s     ^     ` L     ^     K;ÿû¤ÊÙ òCH¤ÊÙK;ÿû¤ÊÙK;ÿû¤ÊÙ       7               b n . j s     ^     ` L     ^     K;ÿû¤ÊÙ òCH¤ÊÙK;ÿû¤ÊÙK;ÿû¤ÊÙØ     Õ               b s . j s     ^     ` L     ^     =bÿû¤ÊÙ òCH¤ÊÙ=bÿû¤ÊÙ=bÿû¤ÊÙ       =               c a . j s     ^     ` L     ^     1‰ÿû¤ÊÙ òCH¤ÊÙ1‰ÿû¤ÊÙ1‰ÿû¤ÊÙ       B               c s . j s     ^     ` L     ^     1‰ÿû¤ÊÙ òCH¤ÊÙ£Çÿû¤ÊÙ£Çÿû¤ÊÙ                      c y . j s     ^     ` L     ^     £Çÿû¤ÊÙ òCH¤ÊÙ£Çÿû¤ÊÙ£Çÿû¤ÊÙÈ      Ä               d a . j s     ^     ` L     ^     £Çÿû¤ÊÙ òCH¤ÊÙ> ü¤ÊÙ> ü¤ÊÙ       |               d e . j s    ^     ` L     ^     > ü¤ÊÙ òCH¤ÊÙ;+ ü¤ÊÙ> ü¤ÊÙ                      e l . j s     ^     h R     ^     l6 ü¤ÊÙ òCH¤ÊÙn] ü¤ÊÙn] ü¤ÊÙØ      Ø               e n - a u . j s       ^     h R     ^     )_ ü¤ÊÙ òCH¤ÊÙ)_ ü¤ÊÙ)_ ü¤ÊÙØ      Ø               e n - c a . j s       ^     h R     ^     † ü¤ÊÙ òCH¤ÊÙ† ü¤ÊÙ† ü¤ÊÙØ      Ø               e n - g b . j s       ^     ` L     ^     l6 ü¤ÊÙ òCH¤ÊÙl6 ü¤ÊÙl6 ü¤ÊÙØ      Õ               e n . j s     ^     ` L     ^     ­ ü¤ÊÙ òCH¤ÊÙ­ ü¤ÊÙ­ ü¤ÊÙ       ;               e o . j s     ^     ` L     ^     3½ ü¤ÊÙ òCH¤ÊÙ3½ ü¤ÊÙ3½ ü¤ÊÙ       H               e s . j s     ^     ` L     ^     Vä ü¤ÊÙ òCH¤ÊÙVä ü¤ÊÙVä ü¤ÊÙ       7               e t . j s     ^     ` L     ^     Vä ü¤ÊÙ òCH¤ÊÙVä ü¤ÊÙVä ü¤ÊÙ       I               e u . j s     ^     ` L     ^     ü¤ÊÙ òCH¤ÊÙü¤ÊÙü¤ÊÙ       Q               f a . j s                   ^     l5ü¤ÊÙ òCH¤Ê l5ü¤ÊÙl5ü¤ÊÙ                      f i . j s     !^     ` L     ^     l5ü¤ÊÙ òCH¤ÊÙl5ü¤ÊÙl5ü¤ÊÙ                      f o . j s     #^     h R     ^     ‡ü¤ÊÙ òCH¤ÊÙ‡ü¤ÊÙ‡ü¤ÊÙ       `               f r - c a . j s       "^     ` L     ^     &`ü¤ÊÙ òCH¤ÊÙ&`ü¤ÊÙ&`ü¤ÊÙ       ²               f r . j s     $^     ` L     ^     ƒ–ü¤ÊÙ òCH¤ÊÙƒ–ü¤ÊÙƒ–ü¤ÊÙ       ^               g l . j s     %^     ` L     ^     o½ü¤ÊÙ òCH¤ÊÙo½ü¤ÊÙo½ü¤ÊÙ      ÷               g u . j s     &^     ` L     ^     9Ëü¤ÊÙ òCH¤ÊÙ9Ëü¤ÊÙ9Ëü¤ÊÙ                      h e . j s     '^     ` L     ^     *òü¤ÊÙ òCH¤ÊÙ*òü¤ÊÙ*òü¤ÊÙ       \               h i . j s     (^     ` L     ^     ãü¤ÊÙ òCH¤ÊÙãü¤ÊÙãü¤ÊÙ       õ               h r . j s     )^     ` L     ^     Ñ(ü¤ÊÙ òCH¤ÊÙÑ(ü¤ÊÙÑ(ü¤ÊÙ       f               h u . j s     *^     ` L     ^     |7ü¤ÊÙ òCH¤ÊÙÙKü¤ÊÙÙKü¤ÊÙÀ      »               i s . j s    +^     ` L     ^     ÙKü¤ÊÙ òCH¤ÊÙÙKü¤ÊÙÙKü¤ÊÙ       I               i t . j s     ,^     ` L     ^     Orü¤ÊÙ òCH¤ÊÙOrü¤ÊÙOrü¤ÊÙ       Ü               j a . j s     -^     ` L     ^     ¶ƒü¤ÊÙ òCH¤ÊÙ¢µü¤ÊÙ¢µü¤ÊÙ                      k a . j s     .^     ` L     ^     ¢µü¤ÊÙ òCH¤ÊÙ¢µü¤ÊÙ¢µü¤ÊÙ       !               k m . j s     /^     ` L     ^     ˆÜü¤ÊÙ òCH¤ÊÙˆÜü¤ÊÙˆÜü¤ÊÙ       R               k o . j s     0^     ` L     ^     ‚ü¤Ê  òCH¤ÊÙ‚ü¤ÊÙ‚ü¤ÊÙ       Â               k u . j s     1^     ` L     ^     s*ü¤ÊÙ òCH¤ÊÙs*ü¤ÊÙs*ü¤ÊÙ       1               l t . j s     2^     ` L     ^     â6ü¤ÊÙ òCH¤ÊÙâ6ü¤ÊÙâ6ü¤ÊÙ       ƒ               l v . j s     3^     ` L     ^     kdü¤ÊÙ òCH¤ÊÙkdü¤ÊÙkdü¤ÊÙØ      Õ               m k . j s     4^     ` L     ^     kdü¤ÊÙ òCH¤ÊÙkdü¤ÊÙkdü¤ÊÙ                      m n . j s                                                                  INDX( 	  o7_           (   ¸  è       Ù.  Ù-   Ù        !^     ` L     ^     l5ü¤ÊÙ òCH¤ÊÙl5ü¤ÊÙl5ü¤ÊÙ                      f o . j s     #^     h R     ^     ‡ü¤ÊÙ òCH¤ÊÙ‡ü¤ÊÙ‡ü¤ÊÙ       `               f r - c a . j s       "^     ` L     ^     &`ü¤ÊÙ òCH¤ÊÙ&`ü¤ÊÙ&`ü¤ÊÙ       ²               f r . j s     $^     ` L     ^     ƒ–ü¤ÊÙ òCH¤ÊÙƒ–ü¤ÊÙƒ–ü¤ÊÙ       ^               g l . j s     %^     ` L     ^     o½ü¤ÊÙ òCH¤ÊÙo½ü¤ÊÙo½ü¤Ê        ÷               g u . j s     &^     ` L     ^     9Ëü¤ÊÙ òCH¤ÊÙ9Ëü¤ÊÙ9Ëü¤ÊÙ                      h e . j s     '^     ` L     ^     *òü¤ÊÙ òCH¤ÊÙ*òü¤ÊÙ*òü¤ÊÙ       \               h i . j s     (^     ` L     ^     ãü¤ÊÙ òCH¤ÊÙãü¤ÊÙãü¤ÊÙ       õ    
