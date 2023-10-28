@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Police Station Management system</title>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <meta content="" name="keywords" />
+    <meta content="" name="description" />
+
+    <!-- Favicon -->
+    <link href="img/favicon.ico" rel="icon" />
+
+    <!-- Google Web Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Icon Font Stylesheet -->
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.10.0/css/all.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.4.1/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
+
+    <!-- Libraries Stylesheet -->
+    <link href="lib/owlcarousel/assets/owl.carousel.min.css" rel="stylesheet" />
+    <link
+      href="lib/tempusdominus/css/tempusdominus-bootstrap-4.min.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.3.1/css/bootstrap.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css"
+    />
+
+    <!-- Customized Bootstrap Stylesheet -->
+    <link href="css/bootstrap.min.css" rel="stylesheet" />
+
+    <!-- Template Stylesheet -->
+    <link href="css/style.css" rel="stylesheet" />
+  </head>
+
+  <body>
+    <div class="container-fluid position-relative bg-white d-flex p-0">
+      <!-- Spinner Start -->
+      <div
+        id="spinner"
+        class="show bg-white position-fixed translate-middle w-100 vh-100 top-50 start-50 d-flex align-items-center justify-content-center"
+      >
+        <div
+          class="spinner-border text-primary"
+          style="width: 3rem; height: 3rem"
+          role="status"
+        >
+          <span class="sr-only">Loading...</span>
+        </div>
+      </div>
+      <!-- Spinner End -->
+
+      <!-- Sidebar Start -->
+      <div class="sidebar pe-4 pb-3">
+        <nav class="navbar bg-light navbar-light">
+          <a href="police-dashboard.html" class="navbar-brand mx-4 mb-3">
+            <h3 class="text-primary">DASHBOARD</h3>
+          </a>
+          <div class="d-flex align-items-center ms-4 mb-4">
+            <div class="position-relative">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                height="2.5em"
+                viewBox="0 0 448 512"
+                class="user"
+              >
+                <path
+                  d="M224 256A128 128 0 1 1 224 0a128 128 0 1 1 0 256zM209.1 359.2l-18.6-31c-6.4-10.7 1.3-24.2 13.7-24.2H224h19.7c12.4 0 20.1 13.6 13.7 24.2l-18.6 31 33.4 123.9 36-146.9c2-8.1 9.8-13.4 17.9-11.3c70.1 17.6 121.9 81 121.9 156.4c0 17-13.8 30.7-30.7 30.7H285.5c-2.1 0-4-.4-5.8-1.1l.3 1.1H168l.3-1.1c-1.8 .7-3.8 1.1-5.8 1.1H30.7C13.8 512 0 498.2 0 481.3c0-75.5 51.9-138.9 121.9-156.4c8.1-2 15.9 3.3 17.9 11.3l36 146.9 33.4-123.9z"
+                />
+              </svg>
+              <!-- <div
+                class="bg-success rounded-circle border border-2 border-white position-absolute end-0 bottom-0 p-1"
+              ></div> -->
+            </div>
+            <div class="ms-3">
+              <h6 class="mb-0">User</h6>
+              <span>Admin</span>
+            </div>
+          </div>
+          <div class="navbar-nav w-100">
+            <a href="police-dashboard.html" class="nav-item nav-link"
+              ><i class="fas fa-tachometer-alt"></i> Dashboard</a
+            >
+            <a href="police-arrest.html" class="nav-item nav-link active"
+              ><i class="fa fa-th me-2"></i>Arrests</a
+            >
+            <a href="evidences.html" class="nav-item nav-link"
+              ><i class="fas fa-eye"></i> Evidence</a
+            >
+            <a href="police-missing.html" class="nav-item nav-link"
+              ><i class="fas fa-address-book"></i> Missing</a
+            >
+            <a href="officers.html" class="nav-item nav-link"
+              ><i class="fas fa-user-secret"></i> Officers</a
+            >
+            <a href="safety-prevention.html" class="nav-item nav-link"
+              ><i class="fa fa-chart-bar me-2"></i>Safety</a
+            >
+            <a href="contact.html" class="nav-item nav-link"
+              ><i class="fas fa-id-badge"></i> Contact</a
+            >
+            <a href="about.html" class="nav-item nav-link"
+              ><i class="fas fa-address-card"></i> About Us</a
+            >
+            <a href="signin.html" class="nav-item nav-link"
+              ><i class="fas fa-sign-out-alt"></i> Logout</a
+            >
+          </div>
+        </nav>
+      </div>
+      <!-- Sidebar End -->
+
+      <!-- Content Start -->
+      <div class="content">
+        <!-- Navbar Start -->
+        <nav
+          class="navbar navbar-expand bg-light navbar-light sticky-top px-4 py-0"
+        >
+          <a href="#" class="navbar-brand d-flex d-lg-none me-4">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              height="2em"
+              viewBox="0 0 448 512"
+            >
+              <path
+                d="M224 256A128 128 0 1 1 224 0a128 128 0 1 1 0 256zM209.1 359.2l-18.6-31c-6.4-10.7 1.3-24.2 13.7-24.2H224h19.7c12.4 0 20.1 13.6 13.7 24.2l-18.6 31 33.4 123.9 36-146.9c2-8.1 9.8-13.4 17.9-11.3c70.1 17.6 121.9 81 121.9 156.4c0 17-13.8 30.7-30.7 30.7H285.5c-2.1 0-4-.4-5.8-1.1l.3 1.1H168l.3-1.1c-1.8 .7-3.8 1.1-5.8 1.1H30.7C13.8 512 0 498.2 0 481.3c0-75.5 51.9-138.9 121.9-156.4c8.1-2 15.9 3.3 17.9 11.3l36 146.9 33.4-123.9z"
+              />
+            </svg>
+          </a>
+          <a href="#" class="sidebar-toggler flex-shrink-0 text-dark">
+            <i class="fa fa-bars"></i>
+          </a>
+          <form class="d-none d-md-flex ms-4">
+            <input
+              class="form-control border-0"
+              type="search"
+              placeholder="Search"
+            />
+          </form>
+          <div class="navbar-nav align-items-center ms-auto">
+            <div class="nav-item dropdown">
+              <a
+                href="#"
+                class="nav-link dropdown-toggle"
+                data-bs-toggle="dropdown"
+              >
+                <i class="fa fa-envelope me-lg-2"></i>
+                <span class="d-none d-lg-inline-flex">Messages</span>
+              </a>
+              <div
+                class="dropdown-menu dropdown-menu-end bg-light border-0 rounded-0 rounded-bottom m-0"
+              >
+                <a href="#" class="dropdown-item">
+                  <div class="d-flex align-items-center">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      height="2em"
+                      viewBox="0 0 448 512"
+                    >
+                      <path
+                        d="M224 256A128 128 0 1 1 224 0a128 128 0 1 1 0 256zM209.1 359.2l-18.6-31c-6.4-10.7 1.3-24.2 13.7-24.2H224h19.7c12.4 0 20.1 13.6 13.7 24.2l-18.6 31 33.4 123.9 36-146.9c2-8.1 9.8-13.4 17.9-11.3c70.1 17.6 121.9 81 121.9 156.4c0 17-13.8 30.7-30.7 30.7H285.5c-2.1 0-4-.4-5.8-1.1l.3 1.1H168l.3-1.1c-1.8 .7-3.8 1.1-5.8 1.1H30.7C13.8 512 0 498.2 0 481.3c0-75.5 51.9-138.9 121.9-156.4c8.1-2 15.9 3.3 17.9 11.3l36 146.9 33.4-123.9z"
+                      />
+                    </svg>
+                    <div class="ms-2">
+                      <h6 class="fw-normal mb-0">User_1 send you a message</h6>
+                      <small>15 minutes ago</small>
+                    </div>
+                  </div>
+                </a>
+                <hr class="dropdown-divider" />
+                <a href="#" class="dropdown-item">
+                  <div class="d-flex align-items-center">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      height="2em"
+                      viewBox="0 0 448 512"
+                    >
+                      <path
+                        d="M224 256A128 128 0 1 1 224 0a128 128 0 1 1 0 256zM209.1 359.2l-18.6-31c-6.4-10.7 1.3-24.2 13.7-24.2H224h19.7c12.4 0 20.1 13.6 13.7 24.2l-18.6 31 33.4 123.9 36-146.9c2-8.1 9.8-13.4 17.9-11.3c70.1 17.6 121.9 81 121.9 156.4c0 17-13.8 30.7-30.7 30.7H285.5c-2.1 0-4-.4-5.8-1.1l.3 1.1H168l.3-1.1c-1.8 .7-3.8 1.1-5.8 1.1H30.7C13.8 512 0 498.2 0 481.3c0-75.5 51.9-138.9 121.9-156.4c8.1-2 15.9 3.3 17.9 11.3l36 146.9 33.4-123.9z"
+                      />
+                    </svg>
+                    <div class="ms-2">
+                      <h6 class="fw-normal mb-0">User_2 send you a message</h6>
+                      <small>35 minutes ago</small>
+                    </div>
+                  </div>
+                </a>
+                <hr class="dropdown-divider" />
+                <a href="#" class="dropdown-item">
+                  <div class="d-flex align-items-center">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      height="2em"
+                      viewBox="0 0 448 512"
+                    >
+                      <path
+                        d="M224 256A128 128 0 1 1 224 0a128 128 0 1 1 0 256zM209.1 359.2l-18.6-31c-6.4-10.7 1.3-24.2 13.7-24.2H224h19.7c12.4 0 20.1 13.6 13.7 24.2l-18.6 31 33.4 123.9 36-146.9c2-8.1 9.8-13.4 17.9-11.3c70.1 17.6 121.9 81 121.9 156.4c0 17-13.8 30.7-30.7 30.7H285.5c-2.1 0-4-.4-5.8-1.1l.3 1.1H168l.3-1.1c-1.8 .7-3.8 1.1-5.8 1.1H30.7C13.8 512 0 498.2 0 481.3c0-75.5 51.9-138.9 121.9-156.4c8.1-2 15.9 3.3 17.9 11.3l36 146.9 33.4-123.9z"
+                      />
+                    </svg>
+                    <div class="ms-2">
+                      <h6 class="fw-normal mb-0">User_3 send you a message</h6>
+                      <small>2 hours ago</small>
+                    </div>
+                  </div>
+                </a>
+                <hr class="dropdown-divider" />
+                <a href="#" class="dropdown-item text-center"
+                  >See all message</a
+                >
+              </div>
+            </div>
+            <div class="nav-item dropdown">
+              <a
+                href="#"
+                class="nav-link dropdown-toggle"
+                data-bs-toggle="dropdown"
+              >
+                <i class="fa fa-bell me-lg-2"></i>
+                <span class="d-none d-lg-inline-flex">Notifications</span>
+              </a>
+              <div
+                class="dropdown-menu dropdown-menu-end bg-light border-0 rounded-0 rounded-bottom m-0"
+              >
+                <a href="#" class="dropdown-item">
+                  <h6 class="fw-normal mb-0">Profile updated</h6>
+                  <small>15 minutes ago</small>
+                </a>
+                <hr class="dropdown-divider" />
+                <a href="#" class="dropdown-item">
+                  <h6 class="fw-normal mb-0">New user added</h6>
+                  <small>15 minutes ago</small>
+                </a>
+                <hr class="dropdown-divider" />
+                <a href="#" class="dropdown-item">
+                  <h6 class="fw-normal mb-0">Password changed</h6>
+                  <small>15 minutes ago</small>
+                </a>
+                <hr class="dropdown-divider" />
+                <a href="#" class="dropdown-item text-center"
+                  >See all notifications</a
+                >
+              </div>
+            </div>
+            <div class="nav-item dropdown">
+              <a
+                href="#"
+                class="nav-link dropdown-toggle"
+                data-bs-toggle="dropdown"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  height="2em"
+                  viewBox="0 0 448 512"
+                  class="user"
+                >
+                  <path
+                    d="M224 256A128 128 0 1 1 224 0a128 128 0 1 1 0 256zM209.1 359.2l-18.6-31c-6.4-10.7 1.3-24.2 13.7-24.2H224h19.7c12.4 0 20.1 13.6 13.7 24.2l-18.6 31 33.4 123.9 36-146.9c2-8.1 9.8-13.4 17.9-11.3c70.1 17.6 121.9 81 121.9 156.4c0 17-13.8 30.7-30.7 30.7H285.5c-2.1 0-4-.4-5.8-1.1l.3 1.1H168l.3-1.1c-1.8 .7-3.8 1.1-5.8 1.1H30.7C13.8 512 0 498.2 0 481.3c0-75.5 51.9-138.9 121.9-156.4c8.1-2 15.9 3.3 17.9 11.3l36 146.9 33.4-123.9z"
+                  />
+                </svg>
+                <span class="d-none d-lg-inline-flex">User</span>
+              </a>
+              <div
+                class="dropdown-menu dropdown-menu-end bg-light border-0 rounded-0 rounded-bottom m-0"
+              >
+                <a href="#" class="dropdown-item">My Profile</a>
+                <a href="#" class="dropdown-item">Settings</a>
+                <a href="#" class="dropdown-item">Log Out</a>
+              </div>
+            </div>
+          </div>
+        </nav>
+        <!-- Navbar End -->
+
+        <!-- Sale & Revenue Start -->
+        <!-- <div class="container-fluid pt-4 px-4">
+          <div class="row g-4">
+            <div class="col-sm-12 col-xl-12">
+              <div class="bg-light rounded p-4">
+                <div class="ms-3">
+                  <h1 class="text-center">Evidences</h1>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div> -->
+        <!-- Sale & Revenue End -->
+
+        <!-- Form -->
+        <div class="container py-5">
+          <!-- For demo purpose -->
+          <div class="row mb-4">
+            <div class="col-lg-8 mx-auto text-center">
+              <h1 class="display-4">Form</h1>
+            </div>
+          </div>
+          <!-- End -->
+
+          <div class="row">
+            <div class="col-lg-7 mx-auto">
+              <div class="bg-white rounded-lg shadow-sm p-5">
+                <!-- Credit card form tabs -->
+                <ul
+                  role="tablist"
+                  class="nav bg-light nav-pills rounded-pill nav-fill mb-3"
+                >
+                  <li class="nav-item">
+                    <a
+                      data-toggle="pill"
+                      href="#nav-tab-card"
+                      class="nav-link active rounded-pill"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        height="1em"
+                        viewBox="0 0 640 512"
+                        class="arrest-i pe-1"
+                      >
+                        <style>
+                          svg .arrest-i {
+                            color: #ffffff;
+                          }
+                        </style>
+                        <path
+                          d="M240 32a32 32 0 1 1 64 0 32 32 0 1 1 -64 0zM192 48a32 32 0 1 1 0 64 32 32 0 1 1 0-64zm-32 80c17.7 0 32 14.3 32 32h8c13.3 0 24 10.7 24 24v16c0 1.7-.2 3.4-.5 5.1C280.3 229.6 320 286.2 320 352c0 88.4-71.6 160-160 160S0 440.4 0 352c0-65.8 39.7-122.4 96.5-146.9c-.4-1.6-.5-3.3-.5-5.1V184c0-13.3 10.7-24 24-24h8c0-17.7 14.3-32 32-32zm0 320a96 96 0 1 0 0-192 96 96 0 1 0 0 192zm192-96c0-25.9-5.1-50.5-14.4-73.1c16.9-32.9 44.8-59.1 78.9-73.9c-.4-1.6-.5-3.3-.5-5.1V184c0-13.3 10.7-24 24-24h8c0-17.7 14.3-32 32-32s32 14.3 32 32h8c13.3 0 24 10.7 24 24v16c0 1.7-.2 3.4-.5 5.1C600.3 229.6 640 286.2 640 352c0 88.4-71.6 160-160 160c-62 0-115.8-35.3-142.4-86.9c9.3-22.5 14.4-47.2 14.4-73.1zm224 0a96 96 0 1 0 -192 0 96 96 0 1 0 192 0zM368 0a32 32 0 1 1 0 64 32 32 0 1 1 0-64zm80 48a32 32 0 1 1 0 64 32 32 0 1 1 0-64z"
+                        />
+                      </svg>
+                      Arrested Criminals
+                    </a>
+                  </li>
+                </ul>
+                <!-- End -->
+
+                <!-- Credit card form content -->
+                <div class="tab-content">
+                  <!-- credit card info-->
+                  <div id="nav-tab-card" class="tab-pane fade show active">
+                    <p class="alert alert-secondary">
+                      Some text success or error
+                    </p>
+                    <form role="form">
+                      <div class="form-group">
+                        <label for="username">First Name</label>
+                        <input
+                          type="text"
+                          name="username"
+                          placeholder="Enter Name . . ."
+                          required
+                          class="form-control"
+                        />
+                      </div>
+                      <div class="form-group">
+                        <label for="cardNumber">Last Name</label>
+                        <div class="input-group">
+                          <input
+                            type="text"
+                            name="cardNumber"
+                            placeholder="Enter Name . . ."
+                            class="form-control"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div class="form-group">
+                        <label><span class="hidden-xs">Gender</span></label>
+                        <div>
+                          <form action="/action_page.html">
+                            <div class="form-check-inline">
+                              <label class="form-check-label" for="radio1">
+                                <input
+                                  type="radio"
+                                  class="form-check-input"
+                                  id="radio1"
+                                  name="optradio"
+                                  value="option1"
+                                  checked
+                                />Male
+                              </label>
+                            </div>
+                            <div class="form-check-inline">
+                              <label class="form-check-label" for="radio2">
+                                <input
+                                  type="radio"
+                                  class="form-check-input"
+                                  id="radio2"
+                                  name="optradio"
+                                  value="option2"
+                                />Female
+                              </label>
+                            </div>
+                            <div class="form-check-inline">
+                              <label class="form-check-label">
+                                <input
+                                  type="radio"
+                                  class="form-check-input"
+                                  disabled
+                                />Others
+                              </label>
+                            </div>
+                          </form>
+                        </div>
+                      </div>
+                      <div class="form-group">
+                        <label for="cardNumber">Description</label>
+                        <div class="input-group">
+                          <input
+                            type="text"
+                            name="cardNumber"
+                            placeholder="Description"
+                            class="form-control"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <label for="cardNumber"> Media</label>
+                      <div class="file-upload mb-3">
+                        <div class="file-select rounded">
+                          <div class="file-select-button" id="fileName">
+                            Upload Picture
+                          </div>
+                          <input
+                            type="file"
+                            name="chooseFile"
+                            id="chooseFile"
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        class="subscribe btn btn-primary btn-block rounded-pill shadow-sm"
+                      >
+                        ADD
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          fill="#ffffff"
+                          class="bi bi-arrow-right"
+                          viewBox="0 0 16 16"
+                        >
+                          <path
+                            fill-rule="evenodd"
+                            d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z"
+                          />
+                        </svg>
+                      </button>
+                    </form>
+                  </div>
+                  <!-- End -->
+
+                  <!-- Paypal info -->
+                  <div id="nav-tab-paypal" class="tab-pane fade">
+                    <p>
+                      <button
+                        type="button"
+                        class="btn btn-primary rounded-pill"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          height="1em"
+                          viewBox="0 0 448 512"
+                          class="pe-1"
+                        >
+                          <path
+                            d="M364.2 83.8c-24.4-24.4-64-24.4-88.4 0l-184 184c-42.1 42.1-42.1 110.3 0 152.4s110.3 42.1 152.4 0l152-152c10.9-10.9 28.7-10.9 39.6 0s10.9 28.7 0 39.6l-152 152c-64 64-167.6 64-231.6 0s-64-167.6 0-231.6l184-184c46.3-46.3 121.3-46.3 167.6 0s46.3 121.3 0 167.6l-176 176c-28.6 28.6-75 28.6-103.6 0s-28.6-75 0-103.6l144-144c10.9-10.9 28.7-10.9 39.6 0s10.9 28.7 0 39.6l-144 144c-6.7 6.7-6.7 17.7 0 24.4s17.7 6.7 24.4 0l176-176c24.4-24.4 24.4-64 0-88.4z"
+                          />
+                        </svg>
+                        Case Info
+                      </button>
+                    </p>
+                  </div>
+                  <!-- End -->
+
+                  <!-- bank transfer info -->
+                  <div id="nav-tab-bank" class="tab-pane fade">
+                    <h5 class="pb-1">Case details</h5>
+                    <dl>
+                      <dt>Criminal Name</dt>
+                      <dd>Robert Downey Jr.</dd>
+                    </dl>
+                    <dl>
+                      <dt>Criminal ID</dt>
+                      <dd>7775877975</dd>
+                    </dl>
+                    <dl>
+                      <dt>Jail No.</dt>
+                      <dd>CZ7775877975656</dd>
+                    </dl>
+                    <p class="text-muted">
+                      Lorem ipsum dolor sit amet, consectetur adipisicing elit,
+                      sed do eiusmod tempor incididunt ut labore et dolore magna
+                      aliqua.
+                    </p>
+                    <button
+                      type="button"
+                      class="subscribe btn btn-primary btn-block rounded-pill shadow-sm"
+                    >
+                      Submit
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        height="1em"
+                        viewBox="0 0 448 512"
+                        class="submit-svg pe-2"
+                      >
+                        <style>
+                          .submit-svg {
+                            fill: #ffffff;
+                          }
+                        </style>
+                        <path
+                          d="M438.6 105.4c12.5 12.5 12.5 32.8 0 45.3l-256 256c-12.5 12.5-32.8 12.5-45.3 0l-128-128c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0L160 338.7 393.4 105.4c12.5-12.5 32.8-12.5 45.3 0z"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                  <!-- End -->
+                </div>
+                <!-- End -->
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Form -->
+
+        <!-- evidence details Start-->
+        <div class="row my-5">
+          <div class="col-lg-8 mx-auto text-center">
+            <h1 class="display-4">Arrested Criminals</h1>
+          </div>
+        </div>
+
+        <div class="row row-cols-1 row-cols-md-3 g-4 p-4">
+          <div class="col">
+            <div class="card h-100">
+              <img src="img/kala shopon.jpg" class="card-img-top" alt="..." />
+              <div class="card-body">
+                <h5 class="card-title">Shwapon Mia</h5>
+                <p class="card-text text-secondary">
+                  The Rapid Action Battalion (RAB) has arrested notorious
+                  criminal Swapan Mia aka Kala Swapan of Gazipur’s Lebu Bagan
+                  area.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="card h-100">
+              <img src="img/english.jpg" class="card-img-top" alt="..." />
+              <div class="card-body">
+                <h5 class="card-title">Jackob King</h5>
+                <p class="card-text text-secondary">
+                  Over the last three months a huge operation has been taking
+                  place, with "some of London's longest-standing and most
+                  dangerous criminals" being arrested.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="card h-100">
+              <img src="img/sadman.jpg" class="card-img-top" alt="..." />
+              <div class="card-body">
+                <h5 class="card-title">Sadman Faruki</h5>
+                <p class="card-text">
+                  A man is arrested by the police for looting on the fourth day
+                  of a nationwide strike against the removal of the petrol
+                  subsidy in Lagos
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="card h-100">
+              <img src="img/Gautam Dey.jpg" class="card-img-top" alt="..." />
+              <div class="card-body">
+                <h5 class="card-title">Gautam Dey</h5>
+                <p class="card-text text-secondary">
+                  Police arrested a gang of four cyber criminals who posed as
+                  customer service executives of a payment app and siphoned off
+                  close to Rs 50 lakh from unsuspecting customers.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="card h-100">
+              <img src="img/Md Shahar Ali.jpg" class="card-img-top" alt="..." />
+              <div class="card-body">
+                <h5 class="card-title">Md Shahar Ali</h5>
+                <p class="card-text text-secondary">
+                  The Rapid Action Battalion arrests fugitive war crimes suspect
+                  Md Shahar Ali at a location under Sripur upazila in Gazipur,
+                  on Wednesday.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="card h-100">
+              <img src="img/Nazrul Islam.jpg" class="card-img-top" alt="..." />
+              <div class="card-body">
+                <h5 class="card-title">Nazrul Islam</h5>
+                <p class="card-text text-secondary">
+                  On Friday, the intelligence branch of the RAB headquarters
+                  raided the Mohammadpur area of the capital and arrested Nazrul
+                  Islam.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="text-center">
+          <button type="button" class="btn bg-primary text-white m-2 px-5">
+            Load More
+          </button>
+        </div>
+        <!-- Officers End -->
+
+        <!-- Footer Start -->
+        <div class="container-fluid pt-4 px-4">
+          <div class="bg-light rounded-top p-4">
+            <div class="row">
+              <div
+                class="d-flex justify-content-center align-items-center col-12 text-center"
+              >
+                <h3 style="color: #305c75">Bangladesh</h3>
+                <img
+                  class="text-center px-4"
+                  src="img/BD-police-svg.svg"
+                  alt=""
+                />
+                <h3 style="color: #305c75">Police</h3>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Footer End -->
+      </div>
+      <!-- Content End -->
+
+      <!-- Back to Top -->
+      <a href="#" class="btn btn-lg btn-primary btn-lg-square back-to-top"
+        ><i class="bi bi-arrow-up"></i
+      ></a>
+    </div>
+
+    <!-- JavaScript Libraries -->
+    <script>
+      $(function () {
+        $('[data-toggle="tooltip"]').tooltip();
+      });
+    </script>
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="lib/chart/chart.min.js"></script>
+    <script src="lib/easing/easing.min.js"></script>
+    <script src="lib/waypoints/waypoints.min.js"></script>
+    <script src="lib/owlcarousel/owl.carousel.min.js"></script>
+    <script src="lib/tempusdominus/js/moment.min.js"></script>
+    <script src="lib/tempusdominus/js/moment-timezone.min.js"></script>
+    <script src="lib/tempusdominus/js/tempusdominus-bootstrap-4.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-steps/1.1.0/jquery.steps.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.3.1/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Template Javascript -->
+    <script src="js/main.js"></script>
+  </body>
+</html>

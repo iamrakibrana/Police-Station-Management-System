@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Police Station Management system</title>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <meta content="" name="keywords" />
+    <meta content="" name="description" />
+
+    <!-- Favicon -->
+    <link href="img/favicon.ico" rel="icon" />
+
+    <!-- Google Web Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Icon Font Stylesheet -->
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.10.0/css/all.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.4.1/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
+
+    <!-- Libraries Stylesheet -->
+    <link href="lib/owlcarousel/assets/owl.carousel.min.css" rel="stylesheet" />
+    <link
+      href="lib/tempusdominus/css/tempusdominus-bootstrap-4.min.css"
+      rel="stylesheet"
+    />
+
+    <!-- Customized Bootstrap Stylesheet -->
+    <link href="css/bootstrap.min.css" rel="stylesheet" />
+
+    <!-- Template Stylesheet -->
+    <link href="css/style.css" rel="stylesheet" />
+  </head>
+
+  <body>
+    <div class="container-fluid position-relative bg-white d-flex p-0">
+      <!-- Spinner Start -->
+      <div
+        id="spinner"
+        class="show bg-white position-fixed translate-middle w-100 vh-100 top-50 start-50 d-flex align-items-center justify-content-center"
+      >
+        <div
+          class="spinner-border text-primary"
+          style="width: 3rem; height: 3rem"
+          role="status"
+        >
+          <span class="sr-only">Loading...</span>
+        </div>
+      </div>
+      <!-- Spinner End -->
+
+      <!-- Sidebar Start -->
+      <div class="sidebar pe-4 pb-3">
+        <nav class="navbar bg-light navbar-light">
+          <a href="police-dashboard.html" class="navbar-brand mx-4 mb-3">
+            <h3 class="text-primary">DASHBOARD</h3>
+          </a>
+          <div class="d-flex align-items-center ms-4 mb-4">
+            <div class="position-relative">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                height="2.5em"
+                viewBox="0 0 448 512"
+              >
+                <path
+                  d="M224 256A128 128 0 1 1 224 0a128 128 0 1 1 0 256zM209.1 359.2l-18.6-31c-6.4-10.7 1.3-24.2 13.7-24.2H224h19.7c12.4 0 20.1 13.6 13.7 24.2l-18.6 31 33.4 123.9 36-146.9c2-8.1 9.8-13.4 17.9-11.3c70.1 17.6 121.9 81 121.9 156.4c0 17-13.8 30.7-30.7 30.7H285.5c-2.1 0-4-.4-5.8-1.1l.3 1.1H168l.3-1.1c-1.8 .7-3.8 1.1-5.8 1.1H30.7C13.8 512 0 498.2 0 481.3c0-75.5 51.9-138.9 121.9-156.4c8.1-2 15.9 3.3 17.9 11.3l36 146.9 33.4-123.9z"
+                />
+              </svg>
+              <!-- <div
+                class="bg-success rounded-circle border border-2 border-white position-absolute end-0 bottom-0 p-1"
+              ></div> -->
+            </div>
+            <div class="ms-3">
+              <h6 class="mb-0">User</h6>
+              <span>Admin</span>
+            </div>
+          </div>
+          <div class="navbar-nav w-100">
+            <a href="police-dashboard.html" class="nav-item nav-link active"
+              ><i class="fas fa-tachometer-alt"></i> Dashboard</a
+            >
+            <a href="police-arrest.html" class="nav-item nav-link"
+              ><i class="fa fa-th me-2"></i>Arrests</a
+            >
+            <a href="evidences.html" class="nav-item nav-link"
+              ><i class="fas fa-eye"></i> Evidence</a
+            >
+            <a href="police-missing.html" class="nav-item nav-link"
+              ><i class="fas fa-address-book"></i> Missing</a
+            >
+            <a href="officers.html" class="nav-item nav-link"
+              ><i class="fas fa-user-secret"></i> Officers</a
+            >
+            <a href="safety-prevention.html" class="nav-item nav-link"
+              ><i class="fa fa-chart-bar me-2"></i>Safety</a
+            >
+            <a href="contact.html" class="nav-item nav-link"
+              ><i class="fas fa-id-badge"></i>Contact</a
+            >
+            <a href="about.html" class="nav-item nav-link"
+              ><i class="fas fa-address-card"></i> About Us</a
+            >
+            <a href="signin.html" class="nav-item nav-link"
+              ><i class="fas fa-sign-out-alt"></i> Logout</a
+            >
+          </div>
+        </nav>
+      </div>
+      <!-- Sidebar End -->
+
+      <!-- Content Start -->
+      <div class="content">
+        <!-- Navbar Start -->
+        <nav
+          class="navbar navbar-expand bg-light navbar-light sticky-top px-4 py-0"
+        >
+          <a href="#" class="navbar-brand d-flex d-lg-none me-4">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              height="2em"
+              viewBox="0 0 448 512"
+            >
+              <path
+                d="M224 256A128 128 0 1 1 224 0a128 128 0 1 1 0 256zM209.1 359.2l-18.6-31c-6.4-10.7 1.3-24.2 13.7-24.2H224h19.7c12.4 0 20.1 13.6 13.7 24.2l-18.6 31 33.4 123.9 36-146.9c2-8.1 9.8-13.4 17.9-11.3c70.1 17.6 121.9 81 121.9 156.4c0 17-13.8 30.7-30.7 30.7H285.5c-2.1 0-4-.4-5.8-1.1l.3 1.1H168l.3-1.1c-1.8 .7-3.8 1.1-5.8 1.1H30.7C13.8 512 0 498.2 0 481.3c0-75.5 51.9-138.9 121.9-156.4c8.1-2 15.9 3.3 17.9 11.3l36 146.9 33.4-123.9z"
+              />
+            </svg>
+          </a>
+          <a href="#" class="sidebar-toggler flex-shrink-0 text-dark">
+            <i class="fa fa-bars"></i>
+          </a>
+          <form class="d-none d-md-flex ms-4">
+            <input
+              class="form-control border-0"
+              type="search"
+              placeholder="Search"
+            />
+          </form>
+          <div class="navbar-nav align-items-center ms-auto">
+            <div class="nav-item dropdown">
+              <a
+                href="#"
+                class="nav-link dropdown-toggle"
+                data-bs-toggle="dropdown"
+              >
+                <i class="fa fa-envelope me-lg-2"></i>
+                <span class="d-none d-lg-inline-flex">Messages</span>
+              </a>
+              <div
+                class="dropdown-menu dropdown-menu-end bg-light border-0 rounded-0 rounded-bottom m-0"
+              >
+                <a href="#" class="dropdown-item">
+                  <div class="d-flex align-items-center">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      height="2em"
+                      viewBox="0 0 448 512"
+                    >
+                      <path
+                        d="M224 256A128 128 0 1 1 224 0a128 128 0 1 1 0 256zM209.1 359.2l-18.6-31c-6.4-10.7 1.3-24.2 13.7-24.2H224h19.7c12.4 0 20.1 13.6 13.7 24.2l-18.6 31 33.4 123.9 36-146.9c2-8.1 9.8-13.4 17.9-11.3c70.1 17.6 121.9 81 121.9 156.4c0 17-13.8 30.7-30.7 30.7H285.5c-2.1 0-4-.4-5.8-1.1l.3 1.1H168l.3-1.1c-1.8 .7-3.8 1.1-5.8 1.1H30.7C13.8 512 0 498.2 0 481.3c0-75.5 51.9-138.9 121.9-156.4c8.1-2 15.9 3.3 17.9 11.3l36 146.9 33.4-123.9z"
+                      />
+                    </svg>
+                    <div class="ms-2">
+                      <h6 class="fw-normal mb-0">User_1 send you a message</h6>
+                      <small>15 minutes ago</small>
+                    </div>
+                  </div>
+                </a>
+                <hr class="dropdown-divider" />
+                <a href="#" class="dropdown-item">
+                  <div class="d-flex align-items-center">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      height="2em"
+                      viewBox="0 0 448 512"
+                    >
+                      <path
+                        d="M224 256A128 128 0 1 1 224 0a128 128 0 1 1 0 256zM209.1 359.2l-18.6-31c-6.4-10.7 1.3-24.2 13.7-24.2H224h19.7c12.4 0 20.1 13.6 13.7 24.2l-18.6 31 33.4 123.9 36-146.9c2-8.1 9.8-13.4 17.9-11.3c70.1 17.6 121.9 81 121.9 156.4c0 17-13.8 30.7-30.7 30.7H285.5c-2.1 0-4-.4-5.8-1.1l.3 1.1H168l.3-1.1c-1.8 .7-3.8 1.1-5.8 1.1H30.7C13.8 512 0 498.2 0 481.3c0-75.5 51.9-138.9 121.9-156.4c8.1-2 15.9 3.3 17.9 11.3l36 146.9 33.4-123.9z"
+                      />
+                    </svg>
+                    <div class="ms-2">
+                      <h6 class="fw-normal mb-0">User_2 send you a message</h6>
+                      <small>35 minutes ago</small>
+                    </div>
+                  </div>
+                </a>
+                <hr class="dropdown-divider" />
+                <a href="#" class="dropdown-item">
+                  <div class="d-flex align-items-center">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      height="2em"
+                      viewBox="0 0 448 512"
+                    >
+                      <path
+                        d="M224 256A128 128 0 1 1 224 0a128 128 0 1 1 0 256zM209.1 359.2l-18.6-31c-6.4-10.7 1.3-24.2 13.7-24.2H224h19.7c12.4 0 20.1 13.6 13.7 24.2l-18.6 31 33.4 123.9 36-146.9c2-8.1 9.8-13.4 17.9-11.3c70.1 17.6 121.9 81 121.9 156.4c0 17-13.8 30.7-30.7 30.7H285.5c-2.1 0-4-.4-5.8-1.1l.3 1.1H168l.3-1.1c-1.8 .7-3.8 1.1-5.8 1.1H30.7C13.8 512 0 498.2 0 481.3c0-75.5 51.9-138.9 121.9-156.4c8.1-2 15.9 3.3 17.9 11.3l36 146.9 33.4-123.9z"
+                      />
+                    </svg>
+                    <div class="ms-2">
+                      <h6 class="fw-normal mb-0">User_3 send you a message</h6>
+                      <small>2 hours ago</small>
+                    </div>
+                  </div>
+                </a>
+                <hr class="dropdown-divider" />
+                <a href="#" class="dropdown-item text-center"
+                  >See all message</a
+                >
+              </div>
+            </div>
+            <div class="nav-item dropdown">
+              <a
+                href="#"
+                class="nav-link dropdown-toggle"
+                data-bs-toggle="dropdown"
+              >
+                <i class="fa fa-bell me-lg-2"></i>
+                <span class="d-none d-lg-inline-flex">Notifications</span>
+              </a>
+              <div
+                class="dropdown-menu dropdown-menu-end bg-light border-0 rounded-0 rounded-bottom m-0"
+              >
+                <a href="#" class="dropdown-item">
+                  <h6 class="fw-normal mb-0">Profile updated</h6>
+                  <small>15 minutes ago</small>
+                </a>
+                <hr class="dropdown-divider" />
+                <a href="#" class="dropdown-item">
+                  <h6 class="fw-normal mb-0">New user added</h6>
+                  <small>15 minutes ago</small>
+                </a>
+                <hr class="dropdown-divider" />
+                <a href="#" class="dropdown-item">
+                  <h6 class="fw-normal mb-0">Password changed</h6>
+                  <small>15 minutes ago</small>
+                </a>
+                <hr class="dropdown-divider" />
+                <a href="#" class="dropdown-item text-center"
+                  >See all notifications</a
+                >
+              </div>
+            </div>
+            <div class="nav-item dropdown">
+              <a
+                href="#"
+                class="nav-link dropdown-toggle"
+                data-bs-toggle="dropdown"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  height="2em"
+                  viewBox="0 0 448 512"
+                >
+                  <path
+                    d="M224 256A128 128 0 1 1 224 0a128 128 0 1 1 0 256zM209.1 359.2l-18.6-31c-6.4-10.7 1.3-24.2 13.7-24.2H224h19.7c12.4 0 20.1 13.6 13.7 24.2l-18.6 31 33.4 123.9 36-146.9c2-8.1 9.8-13.4 17.9-11.3c70.1 17.6 121.9 81 121.9 156.4c0 17-13.8 30.7-30.7 30.7H285.5c-2.1 0-4-.4-5.8-1.1l.3 1.1H168l.3-1.1c-1.8 .7-3.8 1.1-5.8 1.1H30.7C13.8 512 0 498.2 0 481.3c0-75.5 51.9-138.9 121.9-156.4c8.1-2 15.9 3.3 17.9 11.3l36 146.9 33.4-123.9z"
+                  />
+                </svg>
+                <span class="d-none d-lg-inline-flex">User</span>
+              </a>
+              <div
+                class="dropdown-menu dropdown-menu-end bg-light border-0 rounded-0 rounded-bottom m-0"
+              >
+                <a href="#" class="dropdown-item">My Profile</a>
+                <a href="#" class="dropdown-item">Settings</a>
+                <a href="#" class="dropdown-item">Log Out</a>
+              </div>
+            </div>
+          </div>
+        </nav>
+        <!-- Navbar End -->
+
+        <!-- Sale & Revenue Start -->
+        <div class="container-fluid pt-4 px-4">
+          <div class="row g-4">
+            <div class="col-sm-6 col-xl-3">
+              <div
+                class="bg-light rounded d-flex align-items-center justify-content-between p-4"
+              >
+                <i class="fa fa-chart-line fa-3x text-danger"></i>
+                <div class="ms-3">
+                  <p class="mb-2">Total Crime Reported</p>
+                  <div>
+                    <h6 class="mb-0">10,185</h6>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+              <div
+                class="bg-light rounded d-flex align-items-center justify-content-between p-4"
+              >
+                <!-- <i class="fa fa-chart-bar fa-3x text-primary"></i> -->
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  height="3em"
+                  viewBox="0 0 576 512"
+                  class="police-stations-svg"
+                >
+                  <style>
+                    .police-stations-svg {
+                      fill: #92179b;
+                    }
+                  </style>
+                  <path
+                    d="M575.8 255.5c0 18-15 32.1-32 32.1h-32l.7 160.2c.2 35.5-28.5 64.3-64 64.3H128.1c-35.3 0-64-28.7-64-64V287.6H32c-18 0-32-14-32-32.1c0-9 3-17 10-24L266.4 8c7-7 15-8 22-8s15 2 21 7L564.8 231.5c8 7 12 15 11 24zM352 224a64 64 0 1 0 -128 0 64 64 0 1 0 128 0zm-96 96c-44.2 0-80 35.8-80 80c0 8.8 7.2 16 16 16H384c8.8 0 16-7.2 16-16c0-44.2-35.8-80-80-80H256z"
+                  />
+                </svg>
+                <div class="ms-3">
+                  <p class="mb-2">Total police Stations</p>
+                  <div>
+                    <h6 class="mb-0">651</h6>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+              <div
+                class="bg-light rounded d-flex align-items-center justify-content-between p-4"
+              >
+                <!-- <i class="fa fa-chart-area fa-3x text-primary"></i> -->
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  height="3em"
+                  viewBox="0 0 512 512"
+                  class="ongoing-svg"
+                >
+                  <style>
+                    .ongoing-svg {
+                      fill: #64acda;
+                    }
+                  </style>
+                  <path
+                    d="M222.7 32.1c5 16.9-4.6 34.8-21.5 39.8C121.8 95.6 64 169.1 64 256c0 106 86 192 192 192s192-86 192-192c0-86.9-57.8-160.4-137.1-184.1c-16.9-5-26.6-22.9-21.5-39.8s22.9-26.6 39.8-21.5C434.9 42.1 512 140 512 256c0 141.4-114.6 256-256 256S0 397.4 0 256C0 140 77.1 42.1 182.9 10.6c16.9-5 34.8 4.6 39.8 21.5z"
+                  />
+                </svg>
+                <div class="ms-3">
+                  <p class="mb-2">Ongoing Cases</p>
+                  <div>
+                    <h6 class="mb-0">7,546</h6>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+              <div
+                class="bg-light rounded d-flex align-items-center justify-content-between p-4"
+              >
+                <!-- <i class="fa fa-chart-pie fa-3x text-primary"></i> -->
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  height="3em"
+                  viewBox="0 0 448 512"
+                  class="solved-cases-svg"
+                >
+                  <style>
+                    .solved-cases-svg {
+                      fill: #0cb07a;
+                    }
+                  </style>
+                  <path
+                    d="M64 32C28.7 32 0 60.7 0 96V416c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V96c0-35.3-28.7-64-64-64H64zM337 209L209 337c-9.4 9.4-24.6 9.4-33.9 0l-64-64c-9.4-9.4-9.4-24.6 0-33.9s24.6-9.4 33.9 0l47 47L303 175c9.4-9.4 24.6-9.4 33.9 0s9.4 24.6 0 33.9z"
+                  />
+                </svg>
+                <div class="ms-3">
+                  <p class="mb-2">Solved Cases</p>
+                  <div>
+                    <h6 class="mb-0">1,458</h6>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Sale & Revenue End -->
+
+        <!-- Sales Chart Start -->
+        <div class="container-fluid pt-4 px-4">
+          <div class="row g-4">
+            <div class="col-sm-12 col-xl-6">
+              <div class="bg-light text-center rounded p-4">
+                <div
+                  class="d-flex align-items-center justify-content-between mb-4"
+                >
+                  <h6 class="mb-0">Primary Offence</h6>
+                  <a href="">Show All</a>
+                </div>
+                <canvas id="primary-offence"></canvas>
+              </div>
+            </div>
+
+            <div class="col-sm-12 col-xl-6">
+              <div class="bg-light text-center rounded p-4">
+                <div
+                  class="d-flex align-items-center justify-content-between mb-4"
+                >
+                  <h6 class="mb-0">Call For Service & Actions</h6>
+                  <a href="">Show All</a>
+                </div>
+                <canvas id="service-action"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Sales Chart End -->
+
+        <!-- Wanted Criminals -->
+        <div class="container-fluid pt-4 px-4">
+          <div class="row g-4">
+            <div class="col-sm-12 col-xl-6">
+              <div class="bg-light rounded h-100 p-4">
+                <h6 class="mb-4">Most Wanted</h6>
+                <div class="owl-carousel testimonial-carousel">
+                  <div class="testimonial-item text-center">
+                    <img
+                      class="img-fluid rounded-circle mx-auto mb-4"
+                      src="img/Ershad Shikdar.jpg"
+                      style="width: 100px; height: 100px"
+                    />
+                    <h5 class="mb-1">Ershad Shikdar</h5>
+                    <p>Serial Killer</p>
+                    <p class="mb-0">
+                      Ershad Sikder, with 43 cases filed under his name. During
+                      a trial at the lower court, he was sentenced to death in
+                      seven murder cases, along with additional four life
+                      sentences. He tried to appeal the decision by writing a
+                      petition to President Iajuddin Ahmed, but he rejected the
+                      appeal, and Sikder was executed at the Khulna Central jail
+                      on 10 May 2004. He was imprisoned in Khulna District Jail.
+                    </p>
+                    <button
+                      class="tesimonial-btn btn btn-outline-primary w-40 m-2 mt-4"
+                      type="button"
+                    >
+                      More Details
+                    </button>
+                  </div>
+                  <div class="testimonial-item text-center">
+                    <img
+                      class="img-fluid rounded-circle mx-auto mb-4"
+                      src="img/aminul.jpeg"
+                      style="width: 100px; height: 100px"
+                    />
+                    <h5 class="mb-1">Aminul Rasul Sagor</h5>
+                    <p>Serial Killer</p>
+                    <p class="mb-0">
+                      Aminur Rasul Sagor known as 'Tokai Sagor'. Son of Abu
+                      Bakar Siddiq of Bauria in Sandwip, Chittagong, 'Tokai
+                      Sagar' is facing charges in seven criminal cases filed
+                      with the Cantonment, Kotwali and Ramna police stations. He
+                      is also one of 23 top criminals put on a list by the Dhaka
+                      Metropolitan Police. Police last night arrested a man
+                      suspecting him to be top criminal 'Tokai Sagar', in
+                      Dhamrai bridge in Dhaka.
+                    </p>
+                    <button
+                      class="tesimonial-btn btn btn-outline-primary w-40 m-2 mt-4"
+                      type="button"
+                    >
+                      More Details
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- Wanted Criminal Ends -->
+
+            <!-- Criminal Lists -->
+            <div class="col-sm-12 col-xl-6">
+              <div class="bg-light text-center rounded p-4">
+                <div
+                  class="d-flex align-items-center justify-content-between mb-4"
+                >
+                  <h6 class="mb-0">Criminal Lists</h6>
+                  <a href="">Show All</a>
+                </div>
+                <div class="table-responsive">
+                  <table
+                    class="table text-start align-middle table-bordered table-hover mb-0"
+                  >
+                    <thead>
+                      <tr class="text-dark">
+                        <th scope="col">Sr No.</th>
+                        <th scope="col">Criminal Name</th>
+                        <th scope="col">Known as</th>
+                        <th scope="col">Crime Type</th>
+                        <th scope="col">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>01</td>
+                        <td>Tanvir Islam Joy</td>
+                        <td>- - -</td>
+                        <td>Murder</td>
+                        <td>
+                          <a class="btn btn-sm btn-primary" href="">Detail</a>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>02</td>
+                        <td>Jahangir</td>
+                        <td>Kala Jahangir</td>
+                        <td>Serial Killer</td>
+                        <td>
+                          <a class="btn btn-sm btn-primary" href="">Detail</a>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>03</td>
+                        <td>Aminur Rasul Sagor</td>
+                        <td>Tokai Sagor</td>
+                        <td>Serial Killer</td>
+                        <td>
+                          <a class="btn btn-sm btn-primary" href="">Detail</a>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>04</td>
+                        <td>Haris Ahammed</td>
+                        <td>- - -</td>
+                        <td>Arms Smuggling</td>
+                        <td>
+                          <a class="btn btn-sm btn-primary" href="">Detail</a>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>05</td>
+                        <td>Imam Hossain</td>
+                        <td>- - -</td>
+                        <td>Rioting</td>
+                        <td>
+                          <a class="btn btn-sm btn-primary" href="">Detail</a>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>06</td>
+                        <td>Prokash Mukar Biswas</td>
+                        <td>- - -</td>
+                        <td>Homicide</td>
+                        <td>
+                          <a class="btn btn-sm btn-primary" href="">Detail</a>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>07</td>
+                        <td>Jobbar Munna</td>
+                        <td>- - -</td>
+                        <td>Kidnapping</td>
+                        <td>
+                          <a class="btn btn-sm btn-primary" href="">Detail</a>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>08</td>
+                        <td>Moshiur Rahman Kochi</td>
+                        <td>- - -</td>
+                        <td>Rape</td>
+                        <td>
+                          <a class="btn btn-sm btn-primary" href="">Detail</a>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <!-- Criminal Lists Ends -->
+          </div>
+        </div>
+
+        <!-- Widgets Start -->
+        <div class="container-fluid pt-4 px-4">
+          <div class="row g-4">
+            <div class="col-sm-12 col-md-6 col-xl-4">
+              <div class="h-100 bg-light rounded p-4">
+                <div
+                  class="d-flex align-items-center justify-content-between mb-4"
+                >
+                  <h6 class="mb-0">Calender</h6>
+                </div>
+                <div id="calender"></div>
+              </div>
+            </div>
+            <div class="col-sm-12 col-md-6 col-xl-8">
+              <div class="h-100 bg-light rounded p-4">
+                <div
+                  class="d-flex align-items-center justify-content-between mb-4"
+                >
+                  <h6 class="mb-0">Ongoing Cases</h6>
+                  <a href="">Show All</a>
+                </div>
+                <div class="d-flex mb-2">
+                  <input
+                    class="form-control bg-transparent"
+                    type="text"
+                    placeholder="Enter task"
+                  />
+                  <button type="button" class="btn btn-primary ms-2">
+                    Add
+                  </button>
+                </div>
+                <div class="d-flex align-items-center border-bottom py-2">
+                  <input class="form-check-input m-0" type="checkbox" />
+                  <div class="w-100 ms-3">
+                    <div
+                      class="d-flex w-100 align-items-center justify-content-between"
+                    >
+                      <span
+                        ><del
+                          >Wife, 3 children of expat killed in Gazipur . .
+                          .</del
+                        ></span
+                      >
+                      <button class="btn btn-sm">
+                        <i class="fa fa-times"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div class="d-flex align-items-center border-bottom py-2">
+                  <input class="form-check-input m-0" type="checkbox" />
+                  <div class="w-100 ms-3">
+                    <div
+                      class="d-flex w-100 align-items-center justify-content-between"
+                    >
+                      <span
+                        >Bangladeshi film actor Sohel Chowdhury was shot dead .
+                        . .</span
+                      >
+                      <button class="btn btn-sm">
+                        <i class="fa fa-times"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div class="d-flex align-items-center border-bottom py-2">
+                  <input class="form-check-input m-0" type="checkbox" checked />
+                  <div class="w-100 ms-3">
+                    <div
+                      class="d-flex w-100 align-items-center justify-content-between"
+                    >
+                      <span><del>Abrar Fahad murder mystry . . .</del></span>
+                      <button class="btn btn-sm text-primary">
+                        <i class="fa fa-times"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div class="d-flex align-items-center border-bottom py-2">
+                  <input class="form-check-input m-0" type="checkbox" />
+                  <div class="w-100 ms-3">
+                    <div
+                      class="d-flex w-100 align-items-center justify-content-between"
+                    >
+                      <span>Missing Ayat's body cut into six pieces . . .</span>
+                      <button class="btn btn-sm">
+                        <i class="fa fa-times"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div class="d-flex align-items-center pt-2">
+                  <input class="form-check-input m-0" type="checkbox" />
+                  <div class="w-100 ms-3">
+                    <div
+                      class="d-flex w-100 align-items-center justify-content-between"
+                    >
+                      <span
+                        >TV journalist couple Sagar Sarowar and Meherun Runi
+                        were murdered in their apartment . . .</span
+                      >
+                      <button class="btn btn-sm">
+                        <i class="fa fa-times"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Widgets End -->
+
+        <!-- Footer Start -->
+        <div class="container-fluid pt-4 px-4">
+          <div class="bg-light rounded-top p-4">
+            <div class="row">
+              <div
+                class="d-flex justify-content-center align-items-center col-12 text-center"
+              >
+                <h3 style="color: #305c75">Bangladesh</h3>
+                <img
+                  class="text-center px-4"
+                  src="img/BD-police-svg.svg"
+                  alt=""
+                />
+                <h3 style="color: #305c75">Police</h3>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Footer End -->
+      </div>
+      <!-- Content End -->
+
+      <!-- Back to Top -->
+      <a href="#" class="btn btn-lg btn-primary btn-lg-square back-to-top"
+        ><i class="bi bi-arrow-up"></i
+      ></a>
+    </div>
+
+    <!-- JavaScript Libraries -->
+    <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="lib/chart/chart.min.js"></script>
+    <script src="lib/easing/easing.min.js"></script>
+    <script src="lib/waypoints/waypoints.min.js"></script>
+    <script src="lib/owlcarousel/owl.carousel.min.js"></script>
+    <script src="lib/tempusdominus/js/moment.min.js"></script>
+    <script src="lib/tempusdominus/js/moment-timezone.min.js"></script>
+    <script src="lib/tempusdominus/js/tempusdominus-bootstrap-4.min.js"></script>
+
+    <!-- Template Javascript -->
+    <script src="js/main.js"></script>
+  </body>
+</html>

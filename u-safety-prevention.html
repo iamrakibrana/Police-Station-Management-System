@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Police Station Management system</title>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <meta content="" name="keywords" />
+    <meta content="" name="description" />
+
+    <!-- Favicon -->
+    <link href="img/favicon.ico" rel="icon" />
+
+    <!-- Google Web Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Icon Font Stylesheet -->
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.10.0/css/all.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.4.1/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
+
+    <!-- Libraries Stylesheet -->
+    <link href="lib/owlcarousel/assets/owl.carousel.min.css" rel="stylesheet" />
+    <link
+      href="lib/tempusdominus/css/tempusdominus-bootstrap-4.min.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+    />
+
+    <!-- Customized Bootstrap Stylesheet -->
+    <link href="css/bootstrap.min.css" rel="stylesheet" />
+
+    <!-- Template Stylesheet -->
+    <link href="css/style.css" rel="stylesheet" />
+  </head>
+  <style>
+    h2 {
+      color: #333;
+      text-align: center;
+      text-transform: uppercase;
+      font-family: "Roboto", sans-serif;
+      font-weight: bold;
+      position: relative;
+      margin: 40px 0 50px;
+    }
+    h2::after {
+      content: "";
+      width: 100px;
+      position: absolute;
+      margin: 0 auto;
+      height: 3px;
+      background: #ffdc12;
+      left: 0;
+      right: 0;
+      bottom: -10px;
+    }
+    .carousel {
+      width: 650px;
+      margin: 0 auto;
+      padding-bottom: 50px;
+    }
+    .carousel .carousel-item {
+      color: #999;
+      font-size: 14px;
+      text-align: center;
+      overflow: hidden;
+      min-height: 340px;
+    }
+    .carousel .carousel-item a {
+      color: #eb7245;
+    }
+    .carousel .img-box {
+      width: 145px;
+      height: 145px;
+      margin: 0 auto;
+      border-radius: 50%;
+    }
+    .carousel .img-box img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      border-radius: 50%;
+    }
+    .carousel .testimonial {
+      padding: 30px 0 10px;
+    }
+    .carousel .overview {
+      text-align: center;
+      padding-bottom: 5px;
+    }
+    .carousel .overview b {
+      color: #333;
+      font-size: 15px;
+      text-transform: uppercase;
+      display: block;
+      padding-bottom: 5px;
+    }
+    .carousel .star-rating i {
+      font-size: 18px;
+      color: #ffdc12;
+    }
+    .carousel-control-prev,
+    .carousel-control-next {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: #999;
+      text-shadow: none;
+      top: 4px;
+    }
+    .carousel-control-prev i,
+    .carousel-control-next i {
+      font-size: 20px;
+      margin-right: 2px;
+    }
+    .carousel-control-prev {
+      left: auto;
+      right: 40px;
+    }
+    .carousel-control-next i {
+      margin-right: -2px;
+    }
+    .carousel .carousel-indicators {
+      bottom: 15px;
+    }
+    .carousel-indicators li,
+    .carousel-indicators li.active {
+      width: 11px;
+      height: 11px;
+      margin: 1px 5px;
+      border-radius: 50%;
+    }
+    .carousel-indicators li {
+      background: #e2e2e2;
+      border: none;
+    }
+    .carousel-indicators li.active {
+      background: #888;
+    }
+  </style>
+  <body>
+    <div class="container-fluid position-relative bg-white d-flex p-0">
+      <!-- Spinner Start -->
+      <div
+        id="spinner"
+        class="show bg-white position-fixed translate-middle w-100 vh-100 top-50 start-50 d-flex align-items-center justify-content-center"
+      >
+        <div
+          class="spinner-border text-primary"
+          style="width: 3rem; height: 3rem"
+          role="status"
+        >
+          <span class="sr-only">Loading...</span>
+        </div>
+      </div>
+      <!-- Spinner End -->
+
+      <!-- Sidebar Start -->
+      <div class="sidebar pe-4 pb-3">
+        <nav class="navbar bg-light navbar-light">
+          <a href="userdashboard.html" class="navbar-brand mx-4 mb-3">
+            <h3 class="text-primary">DASHBOARD</h3>
+          </a>
+          <div class="d-flex align-items-center ms-4 mb-4">
+            <div class="position-relative">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                height="2.5em"
+                viewBox="0 0 448 512"
+                class="user"
+              >
+                <path
+                  d="M224 256A128 128 0 1 1 224 0a128 128 0 1 1 0 256zM209.1 359.2l-18.6-31c-6.4-10.7 1.3-24.2 13.7-24.2H224h19.7c12.4 0 20.1 13.6 13.7 24.2l-18.6 31 33.4 123.9 36-146.9c2-8.1 9.8-13.4 17.9-11.3c70.1 17.6 121.9 81 121.9 156.4c0 17-13.8 30.7-30.7 30.7H285.5c-2.1 0-4-.4-5.8-1.1l.3 1.1H168l.3-1.1c-1.8 .7-3.8 1.1-5.8 1.1H30.7C13.8 512 0 498.2 0 481.3c0-75.5 51.9-138.9 121.9-156.4c8.1-2 15.9 3.3 17.9 11.3l36 146.9 33.4-123.9z"
+                />
+              </svg>
+              <!-- <div
+                class="bg-success rounded-circle border border-2 border-white position-absolute end-0 bottom-0 p-1"
+              ></div> -->
+            </div>
+            <div class="ms-3">
+              <h6 class="mb-0">User</h6>
+              <!--<span>Admin</span>-->
+            </div>
+          </div>
+          <div class="navbar-nav w-100">
+            <a href="userdashboard.html" class="nav-item nav-link"
+              ><i class="fas fa-tachometer-alt"></i> Dashboard</a
+            >
+            <a href="user-arrest.html" class="nav-item nav-link"
+              ><i class="fa fa-th me-2"></i>Arrests</a
+            >
+            <a href="user-missing.html" class="nav-item nav-link"
+              ><i class="fas fa-address-book"></i> Missing</a
+            >
+            <a href="user-complaint.html" class="nav-item nav-link"
+              ><i class="bi bi-pen-fill"></i> Complaint</a
+            >
+            <a href="u-officers.html" class="nav-item nav-link"
+              ><i class="fas fa-user-secret"></i> Officers</a
+            >
+            <a href="u-safety-prevention.html" class="nav-item nav-link active"
+              ><i class="fa fa-chart-bar me-2"></i>Safety</a
+            >
+            <a href="u-contact.html" class="nav-item nav-link"
+              ><i class="fas fa-id-badge"></i>Contact</a
+            >
+            <a href="u-about.html" class="nav-item nav-link"
+              ><i class="fas fa-address-card"></i> About Us</a
+            >
+            <a href="signin.html" class="nav-item nav-link"
+              ><i class="fas fa-sign-out-alt"></i> Logout</a
+            >
+          </div>
+        </nav>
+      </div>
+      <!-- Sidebar End -->
+
+      <!-- Content Start -->
+      <div class="content">
+        <!-- Navbar Start -->
+        <nav
+          class="navbar navbar-expand bg-light navbar-light sticky-top px-4 py-0"
+        >
+          <a href="#" class="navbar-brand d-flex d-lg-none me-4">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              height="2em"
+              viewBox="0 0 448 512"
+            >
+              <path
+                d="M224 256A128 128 0 1 1 224 0a128 128 0 1 1 0 256zM209.1 359.2l-18.6-31c-6.4-10.7 1.3-24.2 13.7-24.2H224h19.7c12.4 0 20.1 13.6 13.7 24.2l-18.6 31 33.4 123.9 36-146.9c2-8.1 9.8-13.4 17.9-11.3c70.1 17.6 121.9 81 121.9 156.4c0 17-13.8 30.7-30.7 30.7H285.5c-2.1 0-4-.4-5.8-1.1l.3 1.1H168l.3-1.1c-1.8 .7-3.8 1.1-5.8 1.1H30.7C13.8 512 0 498.2 0 481.3c0-75.5 51.9-138.9 121.9-156.4c8.1-2 15.9 3.3 17.9 11.3l36 146.9 33.4-123.9z"
+              />
+            </svg>
+          </a>
+          <a href="#" class="sidebar-toggler flex-shrink-0 text-dark">
+            <i class="fa fa-bars"></i>
+          </a>
+          <form class="d-none d-md-flex ms-4">
+            <input
+              class="form-control border-0"
+              type="search"
+              placeholder="Search"
+            />
+          </form>
+          <div class="navbar-nav align-items-center ms-auto">
+            <div class="nav-item dropdown">
+              <a
+                href="#"
+                class="nav-link dropdown-toggle"
+                data-bs-toggle="dropdown"
+              >
+                <i class="fa fa-envelope me-lg-2"></i>
+                <span class="d-none d-lg-inline-flex">Messages</span>
+              </a>
+              <div
+                class="dropdown-menu dropdown-menu-end bg-light border-0 rounded-0 rounded-bottom m-0"
+              >
+                <a href="#" class="dropdown-item">
+                  <div class="d-flex align-items-center">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      height="2em"
+                      viewBox="0 0 448 512"
+                    >
+                      <path
+                        d="M224 256A128 128 0 1 1 224 0a128 128 0 1 1 0 256zM209.1 359.2l-18.6-31c-6.4-10.7 1.3-24.2 13.7-24.2H224h19.7c12.4 0 20.1 13.6 13.7 24.2l-18.6 31 33.4 123.9 36-146.9c2-8.1 9.8-13.4 17.9-11.3c70.1 17.6 121.9 81 121.9 156.4c0 17-13.8 30.7-30.7 30.7H285.5c-2.1 0-4-.4-5.8-1.1l.3 1.1H168l.3-1.1c-1.8 .7-3.8 1.1-5.8 1.1H30.7C13.8 512 0 498.2 0 481.3c0-75.5 51.9-138.9 121.9-156.4c8.1-2 15.9 3.3 17.9 11.3l36 146.9 33.4-123.9z"
+                      />
+                    </svg>
+                    <div class="ms-2">
+                      <h6 class="fw-normal mb-0">User_1 send you a message</h6>
+                      <small>15 minutes ago</small>
+                    </div>
+                  </div>
+                </a>
+                <hr class="dropdown-divider" />
+                <a href="#" class="dropdown-item">
+                  <div class="d-flex align-items-center">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      height="2em"
+                      viewBox="0 0 448 512"
+                    >
+                      <path
+                        d="M224 256A128 128 0 1 1 224 0a128 128 0 1 1 0 256zM209.1 359.2l-18.6-31c-6.4-10.7 1.3-24.2 13.7-24.2H224h19.7c12.4 0 20.1 13.6 13.7 24.2l-18.6 31 33.4 123.9 36-146.9c2-8.1 9.8-13.4 17.9-11.3c70.1 17.6 121.9 81 121.9 156.4c0 17-13.8 30.7-30.7 30.7H285.5c-2.1 0-4-.4-5.8-1.1l.3 1.1H168l.3-1.1c-1.8 .7-3.8 1.1-5.8 1.1H30.7C13.8 512 0 498.2 0 481.3c0-75.5 51.9-138.9 121.9-156.4c8.1-2 15.9 3.3 17.9 11.3l36 146.9 33.4-123.9z"
+                      />
+                    </svg>
+                    <div class="ms-2">
+                      <h6 class="fw-normal mb-0">User_2 send you a message</h6>
+                      <small>35 minutes ago</small>
+                    </div>
+                  </div>
+                </a>
+                <hr class="dropdown-divider" />
+                <a href="#" class="dropdown-item">
+                  <div class="d-flex align-items-center">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      height="2em"
+                      viewBox="0 0 448 512"
+                    >
+                      <path
+                        d="M224 256A128 128 0 1 1 224 0a128 128 0 1 1 0 256zM209.1 359.2l-18.6-31c-6.4-10.7 1.3-24.2 13.7-24.2H224h19.7c12.4 0 20.1 13.6 13.7 24.2l-18.6 31 33.4 123.9 36-146.9c2-8.1 9.8-13.4 17.9-11.3c70.1 17.6 121.9 81 121.9 156.4c0 17-13.8 30.7-30.7 30.7H285.5c-2.1 0-4-.4-5.8-1.1l.3 1.1H168l.3-1.1c-1.8 .7-3.8 1.1-5.8 1.1H30.7C13.8 512 0 498.2 0 481.3c0-75.5 51.9-138.9 121.9-156.4c8.1-2 15.9 3.3 17.9 11.3l36 146.9 33.4-123.9z"
+                      />
+                    </svg>
+                    <div class="ms-2">
+                      <h6 class="fw-normal mb-0">User_3 send you a message</h6>
+                      <small>2 hours ago</small>
+                    </div>
+                  </div>
+                </a>
+                <hr class="dropdown-divider" />
+                <a href="#" class="dropdown-item text-center"
+                  >See all message</a
+                >
+              </div>
+            </div>
+            <div class="nav-item dropdown">
+              <a
+                href="#"
+                class="nav-link dropdown-toggle"
+                data-bs-toggle="dropdown"
+              >
+                <i class="fa fa-bell me-lg-2"></i>
+                <span class="d-none d-lg-inline-flex">Notifications</span>
+              </a>
+              <div
+                class="dropdown-menu dropdown-menu-end bg-light border-0 rounded-0 rounded-bottom m-0"
+              >
+                <a href="#" class="dropdown-item">
+                  <h6 class="fw-normal mb-0">Profile updated</h6>
+                  <small>15 minutes ago</small>
+                </a>
+                <hr class="dropdown-divider" />
+                <a href="#" class="dropdown-item">
+                  <h6 class="fw-normal mb-0">New user added</h6>
+                  <small>15 minutes ago</small>
+                </a>
+                <hr class="dropdown-divider" />
+                <a href="#" class="dropdown-item">
+                  <h6 class="fw-normal mb-0">Password changed</h6>
+                  <small>15 minutes ago</small>
+                </a>
+                <hr class="dropdown-divider" />
+                <a href="#" class="dropdown-item text-center"
+                  >See all notifications</a
+                >
+              </div>
+            </div>
+            <div class="nav-item dropdown">
+              <a
+                href="#"
+                class="nav-link dropdown-toggle"
+                data-bs-toggle="dropdown"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  height="2em"
+                  viewBox="0 0 448 512"
+                  class="user"
+                >
+                  <path
+                    d="M224 256A128 128 0 1 1 224 0a128 128 0 1 1 0 256zM209.1 359.2l-18.6-31c-6.4-10.7 1.3-24.2 13.7-24.2H224h19.7c12.4 0 20.1 13.6 13.7 24.2l-18.6 31 33.4 123.9 36-146.9c2-8.1 9.8-13.4 17.9-11.3c70.1 17.6 121.9 81 121.9 156.4c0 17-13.8 30.7-30.7 30.7H285.5c-2.1 0-4-.4-5.8-1.1l.3 1.1H168l.3-1.1c-1.8 .7-3.8 1.1-5.8 1.1H30.7C13.8 512 0 498.2 0 481.3c0-75.5 51.9-138.9 121.9-156.4c8.1-2 15.9 3.3 17.9 11.3l36 146.9 33.4-123.9z"
+                  />
+                </svg>
+                <span class="d-none d-lg-inline-flex">User</span>
+              </a>
+              <div
+                class="dropdown-menu dropdown-menu-end bg-light border-0 rounded-0 rounded-bottom m-0"
+              >
+                <a href="#" class="dropdown-item">My Profile</a>
+                <a href="#" class="dropdown-item">Settings</a>
+                <a href="#" class="dropdown-item">Log Out</a>
+              </div>
+            </div>
+          </div>
+        </nav>
+        <!-- Navbar End -->
+
+        <!-- Sale & Revenue Start -->
+        <div class="container-fluid pt-4 px-4">
+          <div class="row g-4">
+            <div class="col-sm-12 col-xl-12">
+              <div class="bg-light rounded p-4">
+                <div class="ms-3">
+                  <h1 class="text-center">Safety & Prevention</h1>
+                </div>
+              </div>
+            </div>
+
+            <h2>Testimonials</h2>
+            <div
+              id="myCarousel"
+              class="carousel slide mt-5"
+              data-ride="carousel"
+            >
+              <!-- Carousel indicators -->
+              <ol class="carousel-indicators">
+                <li
+                  data-target="#myCarousel"
+                  data-slide-to="0"
+                  class="active"
+                ></li>
+                <li data-target="#myCarousel" data-slide-to="1"></li>
+                <li data-target="#myCarousel" data-slide-to="2"></li>
+              </ol>
+              <!-- Wrapper for carousel items -->
+              <div class="carousel-inner">
+                <div class="carousel-item active">
+                  <div class="img-box">
+                    <img src="/img/annie.jpg" alt="" />
+                  </div>
+                  <p class="testimonial">
+                    Phasellus vitae suscipit justo. Mauris pharetra feugiat ante
+                    id lacinia. Etiam faucibus mauris id tempor egestas. Duis
+                    luctus turpis at accumsan tincidunt. Phasellus risus risus,
+                    volutpat vel tellus ac, tincidunt fringilla massa. Etiam
+                    hendrerit dolor eget rutrum.
+                  </p>
+                  <p class="overview">
+                    <b>Annie</b>Seo Analyst at
+                    <a href="#">OsCorp Tech.</a>
+                  </p>
+                </div>
+                <div class="carousel-item">
+                  <div class="img-box">
+                    <img src="/img/paul.jpg" alt="" />
+                  </div>
+                  <p class="testimonial">
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam
+                    eu sem tempor, varius quam at, luctus dui. Mauris magna
+                    metus, dapibus nec turpis vel, semper malesuada ante.
+                    Vestibulum idac nisl bibendum scelerisque non non purus.
+                    Suspendisse varius nibh non aliquet.
+                  </p>
+                  <p class="overview">
+                    <b>Paul Walker</b>Media Analyst at
+                    <a href="#">SkyNet Inc.</a>
+                  </p>
+                </div>
+                <div class="carousel-item">
+                  <div class="img-box">
+                    <img src="/img/antonio.jpg" alt="" />
+                  </div>
+                  <p class="testimonial">
+                    Vestibulum quis quam ut magna consequat faucibus.
+                    Pellentesque eget nisi a mi suscipit tincidunt. Utmtc tempus
+                    dictum risus. Pellentesque viverra sagittis quam at mattis.
+                    Suspendisse potenti. Aliquam sit amet gravida nibh,
+                    facilisis gravida odio. Phasellus auctor velit.
+                  </p>
+                  <p class="overview">
+                    <b>Antonio Moreno</b>Web Developer at
+                    <a href="#">Circle Ltd.</a>
+                  </p>
+                </div>
+              </div>
+              <!-- Carousel controls -->
+              <a
+                class="carousel-control-prev"
+                href="#myCarousel"
+                data-slide="prev"
+              >
+                <i class="fa fa-angle-left"></i>
+              </a>
+              <a
+                class="carousel-control-next"
+                href="#myCarousel"
+                data-slide="next"
+              >
+                <i class="fa fa-angle-right"></i>
+              </a>
+            </div>
+          </div>
+        </div>
+        <!-- Sale & Revenue End -->
+
+        <hr class="mx-4 py-1 rounded text-dark" />
+
+        <div class="col-sm-12 col-xl-12">
+          <div class="rounded p-4">
+            <div class="ms-3">
+              <p class="text-center text-primary">Responsibilities</p>
+              <h1 class="text-center">Serve & Protect</h1>
+            </div>
+          </div>
+        </div>
+
+        <!-- Officers Start-->
+        <div class="responsibilities row row-cols-1 row-cols-md-3 g-4 p-4">
+          <div class="col">
+            <div class="card h-100">
+              <img src="img/patroling.jpg" class="card-img-top" alt="..." />
+              <div class="card-body">
+                <h5 class="card-title">Patroling</h5>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="card h-100">
+              <img
+                src="img/traffic.jpg"
+                class="card-img-top"
+                alt="..."
+                height="290px"
+              />
+              <div class="card-body">
+                <h5 class="card-title">Traffic</h5>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="card h-100">
+              <img
+                src="img/inspection.jpg"
+                class="card-img-top"
+                alt="..."
+                height="290px"
+              />
+              <div class="card-body">
+                <h5 class="card-title">Inspection</h5>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="card h-100">
+              <img src="./img/traffic.jpg" class="card-img-top" alt="..." />
+              <div class="card-body">
+                <h5 class="card-title">Heros</h5>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="card h-100">
+              <img
+                src="img/security.jpg"
+                class="card-img-top"
+                alt="..."
+                height="260px"
+              />
+              <div class="card-body">
+                <h5 class="card-title">Security</h5>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="card h-100">
+              <img src="img/officers.jpg" class="card-img-top" alt="..." />
+              <div class="card-body">
+                <h5 class="card-title">Officers</h5>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="text-center">
+          <button type="button" class="btn bg-primary text-white m-2 px-5">
+            Load More
+          </button>
+        </div>
+        <!-- Officers End -->
+
+        <!-- Footer Start -->
+        <div class="container-fluid pt-4 px-4">
+          <div class="bg-light rounded-top p-4">
+            <div class="row">
+              <div
+                class="d-flex justify-content-center align-items-center col-12 text-center"
+              >
+                <h3 style="color: #305c75">Bangladesh</h3>
+                <img
+                  class="text-center px-4"
+                  src="img/BD-police-svg.svg"
+                  alt=""
+                />
+                <h3 style="color: #305c75">Police</h3>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Footer End -->
+      </div>
+      <!-- Content End -->
+
+      <!-- Back to Top -->
+      <a href="#" class="btn btn-lg btn-primary btn-lg-square back-to-top"
+        ><i class="bi bi-arrow-up"></i
+      ></a>
+    </div>
+
+    <!-- JavaScript Libraries -->
+    <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="lib/chart/chart.min.js"></script>
+    <script src="lib/easing/easing.min.js"></script>
+    <script src="lib/waypoints/waypoints.min.js"></script>
+    <script src="lib/owlcarousel/owl.carousel.min.js"></script>
+    <script src="lib/tempusdominus/js/moment.min.js"></script>
+    <script src="lib/tempusdominus/js/moment-timezone.min.js"></script>
+    <script src="lib/tempusdominus/js/tempusdominus-bootstrap-4.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Template Javascript -->
+    <script src="js/main.js"></script>
+  </body>
+</html>
